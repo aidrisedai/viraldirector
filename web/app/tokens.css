@@ -1,0 +1,36 @@
+/* EdAI design system tokens (from project/_ds/edai-design-system-…/tokens). */
+:root {
+  --emerald-50: #E9F6F0; --emerald-100: #C9EBDD; --emerald-200: #98D8C0; --emerald-300: #61C29F; --emerald-400: #39B28A;
+  --emerald-500: #1FA67A; --emerald-600: #178A65; --emerald-700: #116D50; --emerald-800: #0C523C; --emerald-900: #073628;
+  --black: #0B0B0A; --ink-900: #121211; --ink-800: #1B1B19; --ink-700: #262623; --ink-600: #3A3935; --ink-500: #5C5A54;
+  --ink-400: #7F7C74; --ink-300: #A6A39A; --ink-200: #CFCBC0; --ink-100: #E4DFD3;
+  --cream-200: #EDE5D6; --cream-100: #F4EEE3; --cream-50: #FAF7F1; --white: #FFFFFF;
+  --amber-500: #D9900A; --amber-100: #FBEFD6; --red-500: #C2412F; --red-100: #F7E1DC;
+
+  --brand-accent: var(--emerald-500); --brand-accent-hover: var(--emerald-600); --brand-accent-press: var(--emerald-700);
+  --surface-page: var(--cream-100); --surface-card: var(--white); --surface-dark: var(--black); --surface-dark-card: var(--ink-900);
+  --text-primary: var(--black); --text-on-accent: var(--white); --text-accent: var(--emerald-600);
+  --border-strong: var(--ink-200); --border-dark: var(--ink-700); --focus-ring: rgba(31, 166, 122, .35);
+  --status-warning-bg: var(--amber-100); --status-warning-fg: #8A5A00;
+
+  --font-serif-display: var(--font-baskerville), "Libre Baskerville", Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-outfit), "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --tracking-eyebrow: .16em;
+
+  --radius-md: 10px; --radius-card: 12px; --radius-lg: 16px; --radius-pill: 999px;
+  --dur-fast: 120ms; --dur-base: 200ms; --ease-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* ViralDirector surface values used by the web design (warmer than the DS ink scale). */
+  --vd-hairline: #E4DCCD;
+  --vd-hairline-soft: #EFE8DB;
+  --vd-chip-border: #D9D2C3;
+  --vd-text-body: #4A4A45;
+  --vd-text-muted: #6B6A63;
+  --vd-text-faint: #8A8980;
+  --vd-text-divider: #B5AE9F;
+  --vd-on-dark-muted: #A8A79F;
+  --vd-on-dark-accent: #4FC79B;
+  --vd-media: #1A1A18;
+  --vd-rec: #D9442E;
+  --vd-warn-bar: #E0A23A;
+}
