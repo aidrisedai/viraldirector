@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/colors.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/typography.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/base.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/styles.css">
+<script src="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/_ds_bundle.js"></script>
+<style>body{margin:0;background:#F4EEE3;} a{color:#1FA67A;} a:hover{color:#178A65;}</style>
+</helmet>
+
+<section id="1a" style="padding:64px;display:flex;flex-direction:column;gap:48px;font-family:'Outfit',sans-serif;color:#0B0B0A;width:max-content;">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:760px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#1FA67A;white-space:nowrap;">ViralDirector · MVP flow · 1a</span>
+    </div>
+    <h1 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:48px;line-height:1.1;">From concept to finished video, in one sitting.</h1>
+    <p style="margin:0;font-size:18px;line-height:1.55;color:#4A4A45;text-wrap:pretty;">Six screens of the P0 mobile flow. The creator approves a plan and performs it; the Director handles everything else. Example concept from the PRD: “Why most teens never start a business.”</p>
+  </div>
+
+  <div style="display:flex;gap:40px;align-items:flex-start;">
+
+    <!-- 01 Concept -->
+    <div style="display:flex;flex-direction:column;gap:16px;" data-screen-label="01 Concept">
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#1FA67A;">01 · CONCEPT</span><span style="font-size:15px;color:#4A4A45;">CI-1 → CI-3</span></div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="min-height:874px;box-sizing:border-box;background:#0B0B0A;color:#fff;padding:64px 24px 40px;display:flex;flex-direction:column;gap:28px;font-family:'Outfit',sans-serif;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:15px;font-weight:600;">ViralDirector</span>
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="circle-user" size="{{ 24 }}" color="#A8A79F" hint-size="24px,24px"></x-import>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#4FC79B;">NEW VIDEO</span>
+            <h2 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:30px;line-height:1.15;">What’s your video about?</h2>
+          </div>
+          <div style="background:#121211;border:1px solid #1FA67A;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:16px;box-shadow:0 0 0 3px rgba(31,166,122,.25);">
+            <span style="font-size:19px;line-height:1.4;">Why most teens never start a business</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:13px;color:#8A8980;">One sentence is enough</span>
+              <div style="width:40px;height:40px;border-radius:20px;background:#262623;display:flex;align-items:center;justify-content:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="mic" size="{{ 18 }}" color="#fff" hint-size="18px,18px"></x-import></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:20px;">
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <span style="font-size:13px;color:#A8A79F;">Goal</span>
+              <div style="display:flex;gap:8px;">
+                <span style="padding:9px 16px;border-radius:999px;border:1px solid #262623;font-size:14px;">Grow</span>
+                <span style="padding:9px 16px;border-radius:999px;background:#1FA67A;font-size:14px;font-weight:500;">Teach</span>
+                <span style="padding:9px 16px;border-radius:999px;border:1px solid #262623;font-size:14px;">Sell</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <span style="font-size:13px;color:#A8A79F;">Platform</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <span style="padding:9px 16px;border-radius:999px;background:#1FA67A;font-size:14px;font-weight:500;">Reels / TikTok · 9:16</span>
+                <span style="padding:9px 16px;border-radius:999px;border:1px solid #262623;font-size:14px;">LinkedIn · 4:5</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <span style="font-size:13px;color:#A8A79F;">Length</span>
+              <div style="display:flex;gap:8px;">
+                <span style="padding:9px 16px;border-radius:999px;border:1px solid #262623;font-size:14px;">30s</span>
+                <span style="padding:9px 16px;border-radius:999px;background:#1FA67A;font-size:14px;font-weight:500;">45s</span>
+                <span style="padding:9px 16px;border-radius:999px;border:1px solid #262623;font-size:14px;">60s</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <span style="font-size:13px;color:#A8A79F;">Format</span>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="border:1px solid #1FA67A;border-radius:12px;padding:12px;display:flex;align-items:center;gap:8px;font-size:14px;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="sparkles" size="{{ 16 }}" color="#4FC79B" hint-size="16px,16px"></x-import>Director picks</div>
+                <div style="border:1px solid #262623;border-radius:12px;padding:12px;font-size:14px;color:#A8A79F;">Myth-busting</div>
+                <div style="border:1px solid #262623;border-radius:12px;padding:12px;font-size:14px;color:#A8A79F;">Talking head</div>
+                <div style="border:1px solid #262623;border-radius:12px;padding:12px;font-size:14px;color:#A8A79F;">Story</div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:auto;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" full-width="{{ true }}" icon-right="arrow-right" hint-size="100%,52px">Direct my video</x-import>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- 02 Hook + beats -->
+    <div style="display:flex;flex-direction:column;gap:16px;" data-screen-label="02 Hook">
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#1FA67A;">02 · HOOK &amp; BEATS</span><span style="font-size:15px;color:#4A4A45;">TS-1, TS-2</span></div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="min-height:874px;box-sizing:border-box;background:#0B0B0A;color:#fff;padding:64px 24px 40px;display:flex;flex-direction:column;gap:24px;font-family:'Outfit',sans-serif;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="chevron-left" size="{{ 24 }}" color="#fff" hint-size="24px,24px"></x-import>
+            <span style="font-size:15px;color:#A8A79F;">Step 2 of 4 · Plan</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#4FC79B;">PICK YOUR HOOK</span>
+            <h2 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:26px;line-height:1.15;">The first 3 seconds decide everything.</h2>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="background:#121211;border:1px solid #1FA67A;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:12px;color:#4FC79B;font-weight:600;letter-spacing:.08em;">CONTRARIAN</span><div style="width:22px;height:22px;border-radius:11px;background:#1FA67A;display:flex;align-items:center;justify-content:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 14 }}" color="#fff" hint-size="14px,14px"></x-import></div></div>
+              <span style="font-family:'Libre Baskerville',serif;font-size:18px;line-height:1.35;">“Your first business idea is probably bad — that’s the point.”</span>
+              <span style="font-size:13px;color:#A8A79F;line-height:1.45;">Challenges a belief your audience holds. Opens a loop the payoff closes.</span>
+            </div>
+            <div style="background:#121211;border:1px solid #262623;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+              <span style="font-size:12px;color:#8A8980;font-weight:600;letter-spacing:.08em;">QUESTION</span>
+              <span style="font-size:16px;line-height:1.4;color:#D9D8D0;">“What’s actually stopping you from starting?”</span>
+            </div>
+            <div style="background:#121211;border:1px solid #262623;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+              <span style="font-size:12px;color:#8A8980;font-weight:600;letter-spacing:.08em;">BOLD CLAIM</span>
+              <span style="font-size:16px;line-height:1.4;color:#D9D8D0;">“Most teens never start. Not for the reason you think.”</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:15px;font-weight:600;">Beat sheet</span><span style="font-size:13px;color:#A8A79F;">45s target</span></div>
+            <div style="display:flex;gap:3px;height:8px;">
+              <div style="flex:3;background:#1FA67A;border-radius:4px;"></div>
+              <div style="flex:7;background:#4A4A45;border-radius:4px;"></div>
+              <div style="flex:20;background:#6B6A63;border-radius:4px;"></div>
+              <div style="flex:10;background:#4A4A45;border-radius:4px;"></div>
+              <div style="flex:5;background:#6B6A63;border-radius:4px;"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;">
+              <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #262623;font-size:14px;"><span>Hook</span><span style="color:#A8A79F;">0–3s</span></div>
+              <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #262623;font-size:14px;"><span>Setup</span><span style="color:#A8A79F;">3–10s</span></div>
+              <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #262623;font-size:14px;"><span>3 value beats</span><span style="color:#A8A79F;">10–30s</span></div>
+              <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #262623;font-size:14px;"><span>Payoff</span><span style="color:#A8A79F;">30–40s</span></div>
+              <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:14px;"><span>Loop back to hook</span><span style="color:#A8A79F;">40–45s</span></div>
+            </div>
+          </div>
+          <div style="margin-top:auto;display:flex;gap:10px;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" variant="outline" tone="dark" size="lg" hint-size="120px,52px">Edit script</x-import>
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" full-width="{{ true }}" hint-size="100%,52px">See shot list</x-import>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- 03 Shot list -->
+    <div style="display:flex;flex-direction:column;gap:16px;" data-screen-label="03 Shot list">
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#1FA67A;">03 · CALL SHEET</span><span style="font-size:15px;color:#4A4A45;">SL-1, SL-2, SL-5</span></div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="min-height:874px;box-sizing:border-box;background:#0B0B0A;color:#fff;padding:64px 24px 40px;display:flex;flex-direction:column;gap:20px;font-family:'Outfit',sans-serif;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="chevron-left" size="{{ 24 }}" color="#fff" hint-size="24px,24px"></x-import>
+            <span style="font-size:15px;color:#A8A79F;">Step 3 of 4 · Record</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <h2 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:26px;line-height:1.15;">7 shots · about 15 min</h2>
+            <span style="font-size:14px;color:#A8A79F;">Grouped by where you’ll film them.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:13px;"><span>2 of 7 done</span><span style="color:#A8A79F;">Required 2/5</span></div>
+            <div style="height:4px;background:#262623;border-radius:2px;"><div style="width:29%;height:4px;background:#1FA67A;border-radius:2px;"></div></div>
+          </div>
+          <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#8A8980;">AT YOUR DESK</span>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #262623;border-radius:16px;opacity:.55;">
+              <div style="width:32px;height:32px;border-radius:16px;background:#1FA67A;display:flex;align-items:center;justify-content:center;flex:none;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 16 }}" color="#fff" hint-size="16px,16px"></x-import></div>
+              <div style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-size:15px;">Hook · walk into frame</span><span style="font-size:13px;color:#A8A79F;">Hook shot · 3s</span></div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #262623;border-radius:16px;opacity:.55;">
+              <div style="width:32px;height:32px;border-radius:16px;background:#1FA67A;display:flex;align-items:center;justify-content:center;flex:none;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 16 }}" color="#fff" hint-size="16px,16px"></x-import></div>
+              <div style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-size:15px;">Setup line</span><span style="font-size:13px;color:#A8A79F;">A-roll · chest-up · 7s</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;padding:14px;border:1px solid #1FA67A;border-radius:16px;background:#121211;">
+              <div style="display:flex;gap:12px;align-items:center;">
+                <div style="width:32px;height:32px;border-radius:16px;border:1.5px solid #1FA67A;display:flex;align-items:center;justify-content:center;flex:none;font-size:14px;color:#4FC79B;">3</div>
+                <div style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-size:15px;font-weight:500;">Value beat 1</span><span style="font-size:13px;color:#A8A79F;">A-roll · chest-up · 8s</span></div>
+                <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Badge" tone="solid" hint-size="54px,24px">Next</x-import>
+              </div>
+              <span style="font-size:13px;line-height:1.5;color:#D9D8D0;">Phone at eye height, window light in front. Energy 4/5 — say it like you’re letting them in on something.</span>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #262623;border-radius:16px;">
+              <div style="width:32px;height:32px;border-radius:16px;border:1px solid #4A4A45;display:flex;align-items:center;justify-content:center;flex:none;font-size:14px;color:#A8A79F;">4</div>
+              <div style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-size:15px;">Hands sketching the app</span><span style="font-size:13px;color:#A8A79F;">B-roll · close-up · 3s</span></div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #262623;border-radius:16px;">
+              <div style="width:32px;height:32px;border-radius:16px;border:1px dashed #4A4A45;display:flex;align-items:center;justify-content:center;flex:none;font-size:14px;color:#A8A79F;">5</div>
+              <div style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-size:15px;">Raise an eyebrow</span><span style="font-size:13px;color:#A8A79F;">Reaction · new angle · 1s</span></div>
+              <span style="font-size:12px;color:#8A8980;">Optional</span>
+            </div>
+          </div>
+          <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#8A8980;">ANYWHERE</span>
+          <div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #262623;border-radius:16px;">
+            <div style="width:32px;height:32px;border-radius:16px;border:1px solid #4A4A45;display:flex;align-items:center;justify-content:center;flex:none;font-size:14px;color:#A8A79F;">6</div>
+            <div style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-size:15px;">Phone showing a first sale</span><span style="font-size:13px;color:#A8A79F;">Insert · hold to lens · 3s</span></div>
+          </div>
+          <div style="margin-top:auto;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" full-width="{{ true }}" icon="video" hint-size="100%,52px">Record shot 3</x-import>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- 04 Recording -->
+    <div style="display:flex;flex-direction:column;gap:16px;" data-screen-label="04 Recording">
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#1FA67A;">04 · GUIDED RECORDING</span><span style="font-size:15px;color:#4A4A45;">GR-1 → GR-3</span></div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="height:874px;position:relative;background:#1A1A18;color:#fff;font-family:'Outfit',sans-serif;overflow:hidden;">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#4A4A45;font-size:14px;letter-spacing:.1em;">CAMERA FEED</div>
+          <div style="position:absolute;top:0;bottom:0;left:33.3%;width:1px;background:rgba(255,255,255,.18);"></div>
+          <div style="position:absolute;top:0;bottom:0;left:66.6%;width:1px;background:rgba(255,255,255,.18);"></div>
+          <div style="position:absolute;left:0;right:0;top:33.3%;height:1px;background:rgba(255,255,255,.18);"></div>
+          <div style="position:absolute;left:0;right:0;top:66.6%;height:1px;background:rgba(255,255,255,.18);"></div>
+          <div style="position:absolute;left:96px;right:96px;top:250px;height:1px;border-top:1.5px dashed #4FC79B;"></div>
+          <span style="position:absolute;left:96px;top:232px;font-size:11px;color:#4FC79B;letter-spacing:.08em;">EYE LINE</span>
+          <div style="position:absolute;left:24px;right:72px;top:560px;height:120px;border:1px dashed rgba(255,255,255,.35);border-radius:8px;display:flex;align-items:flex-end;padding:8px;box-sizing:border-box;"><span style="font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.08em;">CAPTION SAFE ZONE</span></div>
+          <div style="position:absolute;top:60px;left:16px;right:16px;display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="width:40px;height:40px;border-radius:20px;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="x" size="{{ 20 }}" color="#fff" hint-size="20px,20px"></x-import></div>
+              <span style="padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.55);font-size:14px;">Shot 3 of 7 · A-roll</span>
+              <div style="width:40px;height:40px;border-radius:20px;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="switch-camera" size="{{ 20 }}" color="#fff" hint-size="20px,20px"></x-import></div>
+            </div>
+            <div style="background:rgba(0,0,0,.72);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+              <span style="font-size:20px;line-height:1.4;font-weight:500;"><span style="color:#4FC79B;">Bad ideas teach you</span> what real users actually want —</span>
+              <span style="font-size:20px;line-height:1.4;color:rgba(255,255,255,.5);">and you only find that out by shipping.</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <span style="padding:6px 12px;border-radius:999px;background:rgba(0,0,0,.55);font-size:13px;">Energy 4/5</span>
+              <span style="padding:6px 12px;border-radius:999px;background:rgba(0,0,0,.55);font-size:13px;">Look at lens</span>
+            </div>
+          </div>
+          <div style="position:absolute;bottom:48px;left:0;right:0;display:flex;align-items:center;justify-content:space-around;">
+            <span style="font-size:15px;font-variant-numeric:tabular-nums;width:72px;text-align:center;">0:04 / 0:08</span>
+            <div style="width:80px;height:80px;border-radius:40px;border:4px solid #fff;display:flex;align-items:center;justify-content:center;box-sizing:border-box;"><div style="width:30px;height:30px;border-radius:6px;background:#D9442E;"></div></div>
+            <span style="font-size:13px;color:rgba(255,255,255,.7);width:72px;text-align:center;">Auto-stops</span>
+          </div>
+          <div style="position:absolute;bottom:0;left:0;height:4px;width:50%;background:#1FA67A;"></div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- 05 Take review -->
+    <div style="display:flex;flex-direction:column;gap:16px;" data-screen-label="05 Take review">
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#1FA67A;">05 · TAKE REVIEW</span><span style="font-size:15px;color:#4A4A45;">GR-4</span></div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="min-height:874px;box-sizing:border-box;background:#0B0B0A;color:#fff;padding:64px 24px 40px;display:flex;flex-direction:column;gap:24px;font-family:'Outfit',sans-serif;">
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:15px;color:#A8A79F;">Shot 3 · Take 1</span><span style="font-size:15px;color:#A8A79F;">0:08</span></div>
+          <div style="height:300px;border-radius:16px;background:#1A1A18;display:flex;align-items:center;justify-content:center;position:relative;">
+            <div style="width:56px;height:56px;border-radius:28px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="play" size="{{ 22 }}" color="#fff" hint-size="22px,22px"></x-import></div>
+            <span style="position:absolute;bottom:12px;left:14px;font-size:12px;color:#6B6A63;letter-spacing:.08em;">TAKE PLAYBACK</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#E0A23A;">DIRECTOR’S CALL · RETAKE</span>
+            <span style="font-family:'Libre Baskerville',serif;font-size:21px;line-height:1.35;">“Good energy. You rushed the last three words — try it again slower.”</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px;background:#121211;border:1px solid #262623;border-radius:16px;padding:18px;">
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:14px;"><span>Audio</span><span style="color:#A8A79F;">Clear</span></div><div style="height:4px;background:#262623;border-radius:2px;"><div style="width:92%;height:4px;background:#1FA67A;border-radius:2px;"></div></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:14px;"><span>Framing</span><span style="color:#A8A79F;">On mark</span></div><div style="height:4px;background:#262623;border-radius:2px;"><div style="width:88%;height:4px;background:#1FA67A;border-radius:2px;"></div></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:14px;"><span>Energy</span><span style="color:#A8A79F;">Strong</span></div><div style="height:4px;background:#262623;border-radius:2px;"><div style="width:84%;height:4px;background:#1FA67A;border-radius:2px;"></div></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:14px;"><span>Line accuracy</span><span style="color:#E0A23A;">Ending rushed</span></div><div style="height:4px;background:#262623;border-radius:2px;"><div style="width:61%;height:4px;background:#E0A23A;border-radius:2px;"></div></div></div>
+          </div>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" full-width="{{ true }}" icon="rotate-ccw" hint-size="100%,52px">Retake</x-import>
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" variant="ghost" tone="dark" size="lg" full-width="{{ true }}" hint-size="100%,52px">Use this take anyway</x-import>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- 06 Assembly / export -->
+    <div style="display:flex;flex-direction:column;gap:16px;" data-screen-label="06 Assembly">
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#1FA67A;">06 · ASSEMBLE &amp; EXPORT</span><span style="font-size:15px;color:#4A4A45;">AS-1 → AS-6, EX-1</span></div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="min-height:874px;box-sizing:border-box;background:#0B0B0A;color:#fff;padding:64px 24px 40px;display:flex;flex-direction:column;gap:20px;font-family:'Outfit',sans-serif;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:15px;color:#A8A79F;">Step 4 of 4 · Your video</span>
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Badge" tone="solid" dot="{{ true }}" hint-size="80px,24px">Ready</x-import>
+          </div>
+          <div style="display:flex;gap:16px;">
+            <div style="width:190px;height:338px;border-radius:16px;background:#1A1A18;position:relative;flex:none;overflow:hidden;">
+              <span style="position:absolute;top:12px;left:12px;font-size:11px;color:#6B6A63;letter-spacing:.08em;">9:16 PREVIEW</span>
+              <div style="position:absolute;left:12px;right:12px;top:150px;text-align:center;font-weight:700;font-size:17px;line-height:1.2;text-transform:uppercase;">Your first idea is <span style="color:#4FC79B;">probably bad</span></div>
+              <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:#262623;"><div style="width:22%;height:3px;background:#fff;"></div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:14px;flex:1;">
+              <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Libre Baskerville',serif;font-size:30px;">0:44</span><span style="font-size:13px;color:#A8A79F;">7 shots · 1 retake</span></div>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+                <div style="display:flex;gap:8px;align-items:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 16 }}" color="#4FC79B" hint-size="16px,16px"></x-import>Hook under 3s</div>
+                <div style="display:flex;gap:8px;align-items:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 16 }}" color="#4FC79B" hint-size="16px,16px"></x-import>Captions in safe zone</div>
+                <div style="display:flex;gap:8px;align-items:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 16 }}" color="#4FC79B" hint-size="16px,16px"></x-import>No audio clipping</div>
+                <div style="display:flex;gap:8px;align-items:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 16 }}" color="#4FC79B" hint-size="16px,16px"></x-import>All required shots</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #262623;font-size:15px;"><span>Hook</span><span style="color:#A8A79F;display:flex;align-items:center;gap:6px;">Contrarian<x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="chevron-right" size="{{ 16 }}" color="#6B6A63" hint-size="16px,16px"></x-import></span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #262623;font-size:15px;"><span>Music</span><span style="color:#A8A79F;display:flex;align-items:center;gap:6px;">Calm build<x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="chevron-right" size="{{ 16 }}" color="#6B6A63" hint-size="16px,16px"></x-import></span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #262623;font-size:15px;"><span>Captions</span><span style="color:#A8A79F;display:flex;align-items:center;gap:6px;">Bold · keyword<x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="chevron-right" size="{{ 16 }}" color="#6B6A63" hint-size="16px,16px"></x-import></span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;font-size:15px;"><span>Swap a take</span><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="chevron-right" size="{{ 16 }}" color="#6B6A63" hint-size="16px,16px"></x-import></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:13px;color:#A8A79F;">Export</span>
+            <div style="display:flex;gap:8px;">
+              <span style="padding:9px 14px;border-radius:999px;background:#1FA67A;font-size:14px;font-weight:500;">9:16</span>
+              <span style="padding:9px 14px;border-radius:999px;background:#1FA67A;font-size:14px;font-weight:500;">4:5</span>
+              <span style="padding:9px 14px;border-radius:999px;border:1px solid #262623;font-size:14px;">1:1</span>
+              <span style="padding:9px 14px;border-radius:999px;border:1px solid #262623;font-size:14px;">16:9</span>
+            </div>
+          </div>
+          <div style="margin-top:auto;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" full-width="{{ true }}" icon="download" hint-size="100%,52px">Export 2 videos</x-import>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/colors.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/typography.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/tokens/base.css">
+<link rel="stylesheet" href="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/styles.css">
+<script src="_ds/edai-design-system-c2118bb9-9641-480b-9522-d8a1d96c2412/_ds_bundle.js"></script>
+<style>body{margin:0;background:#F4EEE3;} a{color:#178A65;} a:hover{color:#0B0B0A;}</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;font-family:'Outfit',sans-serif;color:#0B0B0A;background:#F4EEE3;">
+
+  <header style="display:flex;align-items:center;gap:24px;padding:16px 32px;border-bottom:1px solid #E4DCCD;background:#F4EEE3;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-family:'Libre Baskerville',serif;font-size:20px;">ViralDirector</span>
+      <span style="color:#B5AE9F;">/</span>
+      <span style="font-size:15px;color:#4A4A45;">Why most teens never start a business</span>
+    </div>
+    <nav style="display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;">
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="6">
+        <button onClick="{{ s.go }}" style="display:flex;align-items:center;gap:8px;padding:8px 14px 8px 8px;border-radius:999px;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:14px;background:{{ s.bg }};color:{{ s.fg }};">
+          <span style="width:22px;height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;background:{{ s.dotBg }};color:{{ s.dotFg }};">{{ s.n }}</span>{{ s.label }}
+        </button>
+      </sc-for>
+    </nav>
+  </header>
+
+  <!-- 1 CONCEPT -->
+  <sc-if value="{{ is1 }}" hint-placeholder-val="{{ true }}">
+    <main data-screen-label="01 Concept" style="flex:1;display:flex;justify-content:center;padding:64px 32px;">
+      <div style="width:100%;max-width:760px;display:flex;flex-direction:column;gap:40px;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#178A65;">NEW VIDEO</span>
+          <h1 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:44px;line-height:1.1;">What’s your video about?</h1>
+          <p style="margin:0;font-size:17px;line-height:1.55;color:#4A4A45;">One sentence is enough. The Director writes the hook, script and shot list.</p>
+        </div>
+        <div style="background:#fff;border:1px solid #1FA67A;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:20px;box-shadow:0 0 0 3px rgba(31,166,122,.25);">
+          <span style="font-size:24px;line-height:1.35;">Why most teens never start a business</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:14px;color:#6B6A63;">Type or dictate</span>
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" variant="outline" size="sm" icon="mic" hint-size="100px,36px">Dictate</x-import>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:32px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:14px;font-weight:500;">Goal</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="padding:8px 16px;border-radius:999px;border:1px solid #D9D2C3;font-size:14px;">Grow</span>
+              <span style="padding:8px 16px;border-radius:999px;background:#0B0B0A;color:#fff;font-size:14px;">Teach</span>
+              <span style="padding:8px 16px;border-radius:999px;border:1px solid #D9D2C3;font-size:14px;">Sell</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:14px;font-weight:500;">Length</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="padding:8px 16px;border-radius:999px;border:1px solid #D9D2C3;font-size:14px;">30s</span>
+              <span style="padding:8px 16px;border-radius:999px;background:#0B0B0A;color:#fff;font-size:14px;">45s</span>
+              <span style="padding:8px 16px;border-radius:999px;border:1px solid #D9D2C3;font-size:14px;">60s</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:14px;font-weight:500;">Platform</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="padding:8px 16px;border-radius:999px;background:#0B0B0A;color:#fff;font-size:14px;">Reels / TikTok</span>
+              <span style="padding:8px 16px;border-radius:999px;border:1px solid #D9D2C3;font-size:14px;">LinkedIn</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:14px;font-weight:500;">Audience</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="padding:8px 16px;border-radius:999px;background:#0B0B0A;color:#fff;font-size:14px;">Teens 13–18</span>
+              <span style="padding:8px 16px;border-radius:999px;border:1px solid #D9D2C3;font-size:14px;">Parents</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <span style="font-size:14px;font-weight:500;">Format</span>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;">
+            <div style="background:#fff;border:1px solid #1FA67A;border-radius:12px;padding:14px;display:flex;align-items:center;gap:8px;font-size:14px;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="sparkles" size="{{ 16 }}" color="#178A65" hint-size="16px,16px"></x-import>Director picks</div>
+            <div style="border:1px solid #D9D2C3;border-radius:12px;padding:14px;font-size:14px;color:#4A4A45;">Talking head</div>
+            <div style="border:1px solid #D9D2C3;border-radius:12px;padding:14px;font-size:14px;color:#4A4A45;">Myth-busting</div>
+            <div style="border:1px solid #D9D2C3;border-radius:12px;padding:14px;font-size:14px;color:#4A4A45;">Story</div>
+            <div style="border:1px solid #D9D2C3;border-radius:12px;padding:14px;font-size:14px;color:#4A4A45;">Tutorial</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;">
+          <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" icon-right="arrow-right" on-click="{{ go2 }}" hint-size="200px,52px">Direct my video</x-import>
+        </div>
+      </div>
+    </main>
+  </sc-if>
+
+  <!-- 2 PLAN -->
+  <sc-if value="{{ is2 }}" hint-placeholder-val="{{ false }}">
+    <main data-screen-label="02 Plan" style="flex:1;padding:48px 32px;display:flex;justify-content:center;">
+      <div style="width:100%;max-width:1200px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:48px;align-items:start;">
+        <div style="display:flex;flex-direction:column;gap:24px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#178A65;">PICK YOUR HOOK</span>
+            <h1 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:36px;line-height:1.1;">The first 3 seconds decide everything.</h1>
+          </div>
+          <sc-for list="{{ hooks }}" as="h" hint-placeholder-count="3">
+            <button onClick="{{ h.pick }}" style="text-align:left;cursor:pointer;font-family:'Outfit',sans-serif;background:#fff;border:{{ h.border }};border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+                <span style="font-size:12px;color:#178A65;font-weight:600;letter-spacing:.08em;">{{ h.kind }}</span>
+                <span style="font-size:13px;color:#178A65;font-weight:500;">{{ h.tag }}</span>
+              </div>
+              <span style="font-family:'Libre Baskerville',serif;font-size:20px;line-height:1.35;color:#0B0B0A;">{{ h.line }}</span>
+              <span style="font-size:14px;color:#6B6A63;line-height:1.5;">{{ h.why }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:24px;">
+          <div style="background:#fff;border:1px solid #E4DCCD;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:17px;font-weight:600;">Beat sheet</span><span style="font-size:14px;color:#6B6A63;">45s target · 44s planned</span></div>
+            <div style="display:flex;gap:3px;height:10px;">
+              <div style="flex:3;background:#1FA67A;border-radius:4px;"></div>
+              <div style="flex:7;background:#0B0B0A;border-radius:4px;"></div>
+              <div style="flex:20;background:#6B6A63;border-radius:4px;"></div>
+              <div style="flex:10;background:#0B0B0A;border-radius:4px;"></div>
+              <div style="flex:5;background:#6B6A63;border-radius:4px;"></div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #E4DCCD;border-radius:16px;padding:8px 24px;display:flex;flex-direction:column;">
+            <div style="display:grid;grid-template-columns:110px 1fr 56px;gap:16px;padding:16px 0;border-bottom:1px solid #EFE8DB;">
+              <span style="font-size:13px;font-weight:600;color:#178A65;">HOOK</span><span style="font-size:15px;line-height:1.5;">Your first business idea is probably bad — that’s the point.</span><span style="font-size:13px;color:#6B6A63;text-align:right;">0–3s</span>
+            </div>
+            <div style="display:grid;grid-template-columns:110px 1fr 56px;gap:16px;padding:16px 0;border-bottom:1px solid #EFE8DB;">
+              <span style="font-size:13px;font-weight:600;color:#6B6A63;">SETUP</span><span style="font-size:15px;line-height:1.5;">Most teens wait for the perfect idea. So they never start.</span><span style="font-size:13px;color:#6B6A63;text-align:right;">3–10s</span>
+            </div>
+            <div style="display:grid;grid-template-columns:110px 1fr 56px;gap:16px;padding:16px 0;border-bottom:1px solid #EFE8DB;">
+              <span style="font-size:13px;font-weight:600;color:#6B6A63;">VALUE ×3</span><span style="font-size:15px;line-height:1.5;">Bad ideas teach you what real users actually want — and you only find that out by shipping.</span><span style="font-size:13px;color:#6B6A63;text-align:right;">10–30s</span>
+            </div>
+            <div style="display:grid;grid-template-columns:110px 1fr 56px;gap:16px;padding:16px 0;border-bottom:1px solid #EFE8DB;">
+              <span style="font-size:13px;font-weight:600;color:#6B6A63;">PAYOFF</span><span style="font-size:15px;line-height:1.5;">My first sale came from idea number four. I only got there because I built one, two and three.</span><span style="font-size:13px;color:#6B6A63;text-align:right;">30–40s</span>
+            </div>
+            <div style="display:grid;grid-template-columns:110px 1fr 56px;gap:16px;padding:16px 0;">
+              <span style="font-size:13px;font-weight:600;color:#6B6A63;">LOOP</span><span style="font-size:15px;line-height:1.5;">So go build the bad one. Because your first idea is probably bad —</span><span style="font-size:13px;color:#6B6A63;text-align:right;">40–45s</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;justify-content:flex-end;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" variant="outline" size="lg" icon="pencil" hint-size="140px,52px">Edit script</x-import>
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" icon-right="arrow-right" on-click="{{ go3 }}" hint-size="180px,52px">See shot list</x-import>
+          </div>
+        </div>
+      </div>
+    </main>
+  </sc-if>
+
+  <!-- 3 SHOTS -->
+  <sc-if value="{{ is3 }}" hint-placeholder-val="{{ false }}">
+    <main data-screen-label="03 Shot list" style="flex:1;padding:48px 32px;display:flex;justify-content:center;">
+      <div style="width:100%;max-width:1200px;display:flex;flex-direction:column;gap:32px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#178A65;">CALL SHEET</span>
+            <h1 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:36px;line-height:1.1;">7 shots · about 15 minutes</h1>
+            <span style="font-size:16px;color:#4A4A45;">Grouped by where you’ll film, not story order.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:240px;">
+            <div style="display:flex;justify-content:space-between;font-size:14px;"><span>2 of 7 recorded</span><span style="color:#6B6A63;">5 required</span></div>
+            <div style="height:6px;background:#E4DCCD;border-radius:3px;"><div style="width:29%;height:6px;background:#1FA67A;border-radius:3px;"></div></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:32px;align-items:start;">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <sc-for list="{{ shots }}" as="sh" hint-placeholder-count="7">
+              <sc-if value="{{ sh.group }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#6B6A63;padding-top:8px;">{{ sh.group }}</span></sc-if>
+              <button onClick="{{ sh.pick }}" style="display:grid;grid-template-columns:36px 1fr auto;gap:14px;align-items:center;padding:14px 16px;background:{{ sh.bg }};border:{{ sh.border }};border-radius:16px;cursor:pointer;text-align:left;font-family:'Outfit',sans-serif;color:#0B0B0A;">
+                <span style="width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:14px;background:{{ sh.dotBg }};color:{{ sh.dotFg }};">{{ sh.mark }}</span>
+                <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:15px;font-weight:500;">{{ sh.title }}</span><span style="font-size:13px;color:#6B6A63;">{{ sh.meta }}</span></span>
+                <span style="font-size:12px;color:#6B6A63;">{{ sh.req }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="background:#fff;border:1px solid #E4DCCD;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:24px;position:sticky;top:24px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#178A65;">SHOT {{ cur.n }} · {{ cur.type }}</span>
+              <h2 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:28px;line-height:1.15;">{{ cur.title }}</h2>
+            </div>
+            <div style="aspect-ratio:16/9;border-radius:12px;background:#EFE8DB;display:flex;align-items:center;justify-content:center;font-size:12px;letter-spacing:.1em;color:#8A8980;">STORYBOARD FRAME</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px;">
+              <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:13px;color:#6B6A63;">Framing</span><span style="font-size:15px;line-height:1.45;">{{ cur.framing }}</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:13px;color:#6B6A63;">Delivery</span><span style="font-size:15px;line-height:1.45;">{{ cur.delivery }}</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:13px;color:#6B6A63;">Duration</span><span style="font-size:15px;">{{ cur.dur }}</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid #EFE8DB;padding-top:20px;">
+              <span style="font-size:13px;color:#6B6A63;">Line</span>
+              <span style="font-family:'Libre Baskerville',serif;font-size:18px;line-height:1.45;">{{ cur.line }}</span>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+              <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" icon="video" on-click="{{ go4 }}" hint-size="180px,52px">Record this shot</x-import>
+              <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" variant="outline" size="lg" icon="upload" hint-size="160px,52px">Upload a clip</x-import>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </sc-if>
+
+  <!-- 4 RECORD -->
+  <sc-if value="{{ is4 }}" hint-placeholder-val="{{ false }}">
+    <main data-screen-label="04 Record" style="flex:1;background:#0B0B0A;color:#fff;padding:32px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:32px;align-items:start;">
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:12px;font-weight:600;letter-spacing:.16em;color:#4FC79B;">SHOT 3 OF 7 · A-ROLL</span>
+          <h2 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:28px;line-height:1.15;">Value beat 1</h2>
+        </div>
+        <div style="background:#121211;border:1px solid #262623;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.5;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="scan-face" size="{{ 18 }}" color="#4FC79B" hint-size="18px,18px" style="margin-top:3px;"></x-import>Chest-up, eyes on the lens, camera at eye height.</div>
+          <div style="display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.5;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="sun" size="{{ 18 }}" color="#4FC79B" hint-size="18px,18px" style="margin-top:3px;"></x-import>Window light in front of you, not behind.</div>
+          <div style="display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.5;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="zap" size="{{ 18 }}" color="#4FC79B" hint-size="18px,18px" style="margin-top:3px;"></x-import>Energy 4/5 — like you’re letting them in on something.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <span style="font-size:13px;color:#A8A79F;">Up next</span>
+          <div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #262623;border-radius:12px;font-size:14px;"><span style="color:#A8A79F;">4</span>Hands sketching the app · B-roll · 3s</div>
+          <div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #262623;border-radius:12px;font-size:14px;"><span style="color:#A8A79F;">5</span>Raise an eyebrow · Reaction · 1s</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:center;">
+        <div style="width:100%;max-width:340px;aspect-ratio:9/16;background:#1A1A18;border-radius:16px;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#4A4A45;font-size:13px;letter-spacing:.1em;">WEBCAM / PHONE FEED</div>
+          <div style="position:absolute;top:0;bottom:0;left:33.3%;width:1px;background:rgba(255,255,255,.16);"></div>
+          <div style="position:absolute;top:0;bottom:0;left:66.6%;width:1px;background:rgba(255,255,255,.16);"></div>
+          <div style="position:absolute;left:0;right:0;top:33.3%;height:1px;background:rgba(255,255,255,.16);"></div>
+          <div style="position:absolute;left:0;right:0;top:66.6%;height:1px;background:rgba(255,255,255,.16);"></div>
+          <div style="position:absolute;left:25%;right:25%;top:28%;border-top:1.5px dashed #4FC79B;"></div>
+          <span style="position:absolute;left:25%;top:calc(28% - 18px);font-size:11px;color:#4FC79B;letter-spacing:.08em;">EYE LINE</span>
+          <div style="position:absolute;left:6%;right:18%;top:64%;height:14%;border:1px dashed rgba(255,255,255,.35);border-radius:8px;display:flex;align-items:flex-end;padding:6px 8px;box-sizing:border-box;"><span style="font-size:10px;color:rgba(255,255,255,.6);letter-spacing:.08em;">CAPTION SAFE ZONE</span></div>
+          <div style="position:absolute;top:14px;left:14px;padding:6px 12px;border-radius:999px;background:rgba(0,0,0,.6);font-size:13px;display:flex;align-items:center;gap:8px;"><span style="width:8px;height:8px;border-radius:4px;background:#D9442E;"></span>0:04 / 0:08</div>
+          <div style="position:absolute;bottom:0;left:0;height:4px;width:50%;background:#1FA67A;"></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <span style="font-size:13px;color:#A8A79F;">Teleprompter</span>
+        <div style="font-size:26px;line-height:1.45;font-weight:500;"><span style="color:#4FC79B;">Bad ideas teach you</span> what real users actually want — <span style="color:#6B6A63;">and you only find that out by shipping.</span></div>
+        <div style="display:flex;align-items:center;gap:20px;padding-top:12px;">
+          <button onClick="{{ go5 }}" style="width:72px;height:72px;border-radius:36px;border:4px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;"><span style="width:26px;height:26px;border-radius:6px;background:#D9442E;"></span></button>
+          <span style="font-size:14px;color:#A8A79F;line-height:1.5;">Stops automatically at 8s.<br>Press space to stop early.</span>
+        </div>
+      </div>
+    </main>
+  </sc-if>
+
+  <!-- 5 REVIEW -->
+  <sc-if value="{{ is5 }}" hint-placeholder-val="{{ false }}">
+    <main data-screen-label="05 Take review" style="flex:1;padding:48px 32px;display:flex;justify-content:center;">
+      <div style="width:100%;max-width:1100px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:48px;align-items:start;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="aspect-ratio:9/16;max-height:620px;background:#1A1A18;border-radius:16px;display:flex;align-items:center;justify-content:center;position:relative;">
+            <div style="width:64px;height:64px;border-radius:32px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="play" size="{{ 24 }}" color="#fff" hint-size="24px,24px"></x-import></div>
+            <span style="position:absolute;bottom:14px;left:16px;font-size:12px;color:#6B6A63;letter-spacing:.08em;">SHOT 3 · TAKE 1 · 0:08</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:28px;">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Badge" tone="warning" style="align-self:flex-start;" hint-size="140px,24px">Director suggests a retake</x-import>
+            <h1 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:32px;line-height:1.25;">“Good energy. You rushed the last three words — try it again slower.”</h1>
+          </div>
+          <div style="background:#fff;border:1px solid #E4DCCD;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:18px;">
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:15px;"><span>Audio</span><span style="color:#6B6A63;">Clear</span></div><div style="height:6px;background:#EFE8DB;border-radius:3px;"><div style="width:92%;height:6px;background:#1FA67A;border-radius:3px;"></div></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:15px;"><span>Framing</span><span style="color:#6B6A63;">On mark</span></div><div style="height:6px;background:#EFE8DB;border-radius:3px;"><div style="width:88%;height:6px;background:#1FA67A;border-radius:3px;"></div></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:15px;"><span>Energy</span><span style="color:#6B6A63;">Strong</span></div><div style="height:6px;background:#EFE8DB;border-radius:3px;"><div style="width:84%;height:6px;background:#1FA67A;border-radius:3px;"></div></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:15px;"><span>Line accuracy</span><span style="color:#8A5A00;">Ending rushed</span></div><div style="height:6px;background:#EFE8DB;border-radius:3px;"><div style="width:61%;height:6px;background:#E0A23A;border-radius:3px;"></div></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;justify-content:space-between;font-size:15px;"><span>Duration</span><span style="color:#6B6A63;">7.6s of 8s</span></div><div style="height:6px;background:#EFE8DB;border-radius:3px;"><div style="width:95%;height:6px;background:#1FA67A;border-radius:3px;"></div></div></div>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" icon="rotate-ccw" on-click="{{ go4 }}" hint-size="140px,52px">Retake</x-import>
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" variant="outline" size="lg" on-click="{{ go6 }}" hint-size="200px,52px">Use this take anyway</x-import>
+          </div>
+        </div>
+      </div>
+    </main>
+  </sc-if>
+
+  <!-- 6 EXPORT -->
+  <sc-if value="{{ is6 }}" hint-placeholder-val="{{ false }}">
+    <main data-screen-label="06 Export" style="flex:1;padding:48px 32px;display:flex;justify-content:center;">
+      <div style="width:100%;max-width:1100px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:48px;align-items:start;">
+        <div style="aspect-ratio:9/16;max-height:640px;background:#1A1A18;border-radius:16px;position:relative;overflow:hidden;color:#fff;">
+          <span style="position:absolute;top:14px;left:16px;font-size:12px;color:#6B6A63;letter-spacing:.08em;">9:16 PREVIEW</span>
+          <div style="position:absolute;left:10%;right:10%;top:44%;text-align:center;font-weight:700;font-size:26px;line-height:1.2;text-transform:uppercase;">Your first idea is <span style="color:#4FC79B;">probably bad</span></div>
+          <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:#262623;"><div style="width:22%;height:4px;background:#fff;"></div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:28px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Badge" tone="accent" dot="{{ true }}" style="align-self:flex-start;" hint-size="120px,24px">Ready to export</x-import>
+            <h1 style="margin:0;font-family:'Libre Baskerville',serif;font-weight:400;font-size:40px;line-height:1.1;">0:44 · 7 shots</h1>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;font-size:15px;">
+            <div style="display:flex;gap:8px;align-items:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 18 }}" color="#1FA67A" hint-size="18px,18px"></x-import>Hook under 3s</div>
+            <div style="display:flex;gap:8px;align-items:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 18 }}" color="#1FA67A" hint-size="18px,18px"></x-import>Captions in safe zone</div>
+            <div style="display:flex;gap:8px;align-items:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 18 }}" color="#1FA67A" hint-size="18px,18px"></x-import>No audio clipping</div>
+            <div style="display:flex;gap:8px;align-items:center;"><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="check" size="{{ 18 }}" color="#1FA67A" hint-size="18px,18px"></x-import>All required shots</div>
+          </div>
+          <div style="background:#fff;border:1px solid #E4DCCD;border-radius:16px;padding:4px 24px;display:flex;flex-direction:column;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid #EFE8DB;font-size:15px;"><span>Hook</span><span style="color:#6B6A63;">Contrarian</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid #EFE8DB;font-size:15px;"><span>Music</span><span style="color:#6B6A63;">Calm build · ducked under speech</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid #EFE8DB;font-size:15px;"><span>Captions</span><span style="color:#6B6A63;">Bold · keyword highlight</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;font-size:15px;"><span>Swap a take</span><x-import component-from-global-scope="EdAIDesignSystem_c2118b.Icon" name="chevron-right" size="{{ 18 }}" color="#6B6A63" hint-size="18px,18px"></x-import></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:14px;font-weight:500;">Export formats</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="padding:8px 16px;border-radius:999px;background:#0B0B0A;color:#fff;font-size:14px;">9:16 · Reels, TikTok, Shorts</span>
+              <span style="padding:8px 16px;border-radius:999px;background:#0B0B0A;color:#fff;font-size:14px;">4:5 · Feed</span>
+              <span style="padding:8px 16px;border-radius:999px;border:1px solid #D9D2C3;font-size:14px;">1:1</span>
+              <span style="padding:8px 16px;border-radius:999px;border:1px solid #D9D2C3;font-size:14px;">16:9</span>
+            </div>
+          </div>
+          <div>
+            <x-import component-from-global-scope="EdAIDesignSystem_c2118b.Button" size="lg" icon="download" hint-size="200px,52px">Export 2 videos</x-import>
+          </div>
+        </div>
+      </div>
+    </main>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { step: 1, hook: 0, shot: 2 };
+  renderVals() {
+    const { step, hook, shot } = this.state;
+    const go = n => () => this.setState({ step: n });
+    const labels = ['Concept', 'Plan', 'Shots', 'Record', 'Review', 'Export'];
+    const steps = labels.map((label, i) => {
+      const n = i + 1, on = n === step, done = n < step;
+      return { n, label, go: go(n),
+        bg: on ? '#0B0B0A' : 'transparent', fg: on ? '#fff' : done ? '#0B0B0A' : '#6B6A63',
+        dotBg: on || done ? '#1FA67A' : '#E4DCCD', dotFg: on || done ? '#fff' : '#6B6A63' };
+    });
+    const H = [
+      { kind: 'CONTRARIAN', line: '“Your first business idea is probably bad — that’s the point.”', why: 'Challenges a belief your audience holds and opens a loop the payoff closes.' },
+      { kind: 'QUESTION', line: '“What’s actually stopping you from starting?”', why: 'Invites self-reflection. Softer, slower to land.' },
+      { kind: 'BOLD CLAIM', line: '“Most teens never start. Not for the reason you think.”', why: 'Clear promise of a surprising answer.' },
+    ];
+    const hooks = H.map((h, i) => ({ ...h, tag: i === hook ? 'Selected' : '',
+      border: i === hook ? '1px solid #1FA67A' : '1px solid #E4DCCD', pick: () => this.setState({ hook: i }) }));
+    const S = [
+      { group: 'AT YOUR DESK', title: 'Walk into frame', type: 'HOOK SHOT', meta: 'Hook shot · 3s', dur: '3s', req: '', done: true, framing: 'Start mid-motion, stop at chest-up', delivery: 'Energy 5/5, deliberate pause after “bad”', line: 'Your first business idea is probably bad — that’s the point.' },
+      { title: 'Setup line', type: 'A-ROLL', meta: 'A-roll · chest-up · 7s', dur: '7s', req: '', done: true, framing: 'Chest-up, eyes on lens', delivery: 'Energy 3/5, conversational', line: 'Most teens wait for the perfect idea. So they never start.' },
+      { title: 'Value beat 1', type: 'A-ROLL', meta: 'A-roll · chest-up · 8s', dur: '8s', req: '', framing: 'Chest-up, camera at eye height, window light in front', delivery: 'Energy 4/5, like you’re letting them in on something', line: 'Bad ideas teach you what real users actually want — and you only find that out by shipping.' },
+      { title: 'Hands sketching the app', type: 'B-ROLL', meta: 'B-roll · close-up · 3s', dur: '3s', req: '', framing: 'Overhead close-up of notebook', delivery: 'No line — slow, steady pen strokes', line: 'Covers value beat 1.' },
+      { title: 'Raise an eyebrow', type: 'REACTION', meta: 'Reaction · new angle · 1s', dur: '1s', req: 'Optional', framing: 'Side angle, 45°', delivery: 'Silent beat, pattern interrupt', line: 'No line.' },
+      { title: 'Payoff line', type: 'A-ROLL', meta: 'A-roll · chest-up · 10s', dur: '10s', req: '', framing: 'Chest-up, slightly closer than shot 3', delivery: 'Energy 4/5, slow down on “number four”', line: 'My first sale came from idea number four.' },
+      { group: 'ANYWHERE', title: 'Phone showing a first sale', type: 'INSERT', meta: 'Insert · hold to lens · 3s', dur: '3s', req: '', framing: 'Hold phone to lens, then pull back', delivery: 'No line', line: 'Covers the payoff.' },
+    ];
+    const shots = S.map((s, i) => {
+      const sel = i === shot;
+      return { ...s, group: s.group || '', mark: String(i + 1), pick: () => this.setState({ shot: i }),
+        bg: sel ? '#fff' : 'transparent', border: sel ? '1px solid #1FA67A' : '1px solid #E4DCCD',
+        dotBg: s.done ? '#1FA67A' : 'transparent', dotFg: s.done ? '#fff' : '#6B6A63' };
+    });
+    const c = S[shot];
+    return { steps, hooks, shots, cur: { ...c, n: shot + 1 },
+      is1: step === 1, is2: step === 2, is3: step === 3, is4: step === 4, is5: step === 5, is6: step === 6,
+      go2: go(2), go3: go(3), go4: go(4), go5: go(5), go6: go(6) };
+  }
+}
+</script>
+</body>
+</html>

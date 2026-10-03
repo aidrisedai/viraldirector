@@ -1,0 +1,9 @@
+:root{
+--font-serif-display:"Libre Baskerville",Georgia,"Times New Roman",serif;
+--font-sans:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;
+--font-headline:var(--font-serif-display);--font-body:var(--font-sans);--font-label:var(--font-sans);
+--fs-display:64px;--fs-h1:44px;--fs-h2:32px;--fs-h3:24px;--fs-h4:20px;--fs-body-lg:18px;--fs-body:16px;--fs-small:14px;--fs-caption:12px;--fs-eyebrow:12px;
+--lh-tight:1.1;/* @kind font */--lh-snug:1.25;/* @kind font */--lh-body:1.55;/* @kind font */
+--fw-light:300;/* @kind font */--fw-regular:400;/* @kind font */--fw-medium:500;/* @kind font */--fw-semibold:600;/* @kind font */--fw-bold:700;/* @kind font */
+--tracking-eyebrow:.16em;--tracking-tagline:.08em;--tracking-lockup:.22em;--tracking-tight:-.01em;
+}
