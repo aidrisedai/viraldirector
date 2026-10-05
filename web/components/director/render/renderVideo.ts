@@ -168,8 +168,9 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
       }
     }
   }
-  const [logoLight, logoDark] = o.brand
-    ? await Promise.all([loadImage("/brand/edai-wordmark-black-on-light.jpg"), loadImage("/brand/edai-wordmark-white-on-dark.jpg")])
+  // The wordmark names EdAI over the opening; the end card signs off with the brandmark (star over arch).
+  const [logoLight, brandmark] = o.brand
+    ? await Promise.all([loadImage("/brand/edai-wordmark-black-on-light.jpg"), loadImage("/brand/edai-brandmark-white.png")])
     : [null, null];
 
   const chunks = seq.map((s) => {
@@ -410,18 +411,19 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
     if (o.captions && !titleUp) drawCaptions(i, local);
   };
 
-  /** EdAI end card: white wordmark on black, the call to action, and the tagline bottom-centre. */
+  /** EdAI end card: white brandmark on black, the call to action, and the tagline bottom-centre. */
   const drawEndCard = (t: number) => {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
-    if (!logoDark) return;
-    const lw = W * 0.7, lh = (lw * logoDark.naturalHeight) / logoDark.naturalWidth;
+    if (!brandmark) return;
+    // The PNG includes its own padding around the mark, which doubles as clear space.
+    const lw = W * 0.44, lh = (lw * brandmark.naturalHeight) / brandmark.naturalWidth;
     const s = 0.94 + 0.06 * ease(t / 0.5);
     ctx.save();
     ctx.globalAlpha = ease(t / 0.4);
-    ctx.translate(W / 2, H * 0.4);
+    ctx.translate(W / 2, H * 0.38);
     ctx.scale(s, s);
-    ctx.drawImage(logoDark, -lw / 2, -lh / 2, lw, lh);
+    ctx.drawImage(brandmark, -lw / 2, -lh / 2, lw, lh);
     ctx.restore();
 
     const ctaSize = Math.round(W * 0.052);
@@ -431,7 +433,7 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
     ctx.fillStyle = CREAM;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(o.edit.endCta, W / 2, H * 0.4 + lh / 2 + ctaSize * 0.6 + 24 * (1 - ease((t - 0.35) / 0.4)), W * 0.86);
+    ctx.fillText(o.edit.endCta, W / 2, H * 0.38 + lh / 2 + ctaSize * 0.6 + 24 * (1 - ease((t - 0.35) / 0.4)), W * 0.86);
     ctx.restore();
 
     // Tagline in the footer zone, above the platform's on-screen buttons. Set on balanced lines
