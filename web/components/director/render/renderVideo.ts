@@ -1,13 +1,17 @@
 "use client";
 
-import { captionChunks, FORMATS, timelineSeconds, type FormatKey, type MusicStyle, type Segment, type TimedWord } from "@/lib/edit";
+import { captionChunks, FORMATS, type FormatKey, type MusicStyle, type TimedWord } from "@/lib/edit";
+import type { ComposedEdit, ComposedSegment, Overlay, Extra } from "@/lib/editPlan";
 import { scheduleMusic } from "./music";
 
 export type RenderOptions = {
-  segments: Segment[];
+  edit: ComposedEdit;
+  extras: Extra[];
   format: FormatKey;
   music: MusicStyle;
   captions: boolean;
+  /** EdAI opening logo panel and end card. */
+  brand: boolean;
   /** Shown as an animated title over the opening seconds. */
   hookTitle: string;
   canvas: HTMLCanvasElement;
@@ -30,8 +34,20 @@ const OUTPUT_TYPES = [
 export const outputType = () =>
   typeof MediaRecorder === "undefined" ? null : (OUTPUT_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ?? null);
 
+export const TAGLINE = "Raising Muslim Teens as Builders and Founders";
 const BRAND = "#1FA67A";
-const ease = (x: number) => 1 - (1 - Math.min(1, Math.max(0, x))) ** 3;
+const CREAM = "#F4EEE3";
+const HOOK_FOR = 2.6;
+export const END_CARD_SECONDS = 2.8;
+const FADE = 0.15;
+
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const ease = (x: number) => 1 - (1 - clamp01(x)) ** 3;
+/** Ease-out with a small overshoot, for things that pop in. */
+const back = (x: number) => {
+  const t = clamp01(x) - 1;
+  return 1 + 2.2 * t * t * t + 1.2 * t * t;
+};
 
 function once(target: EventTarget, event: string, timeoutMs = 8000) {
   return new Promise<void>((resolve, reject) => {
@@ -40,21 +56,29 @@ function once(target: EventTarget, event: string, timeoutMs = 8000) {
   });
 }
 
-async function prepareVideo(seg: Segment): Promise<HTMLVideoElement> {
+async function prepareVideo(url: string, at: number, muted = false): Promise<HTMLVideoElement> {
   const v = document.createElement("video");
   v.playsInline = true;
   v.preload = "auto";
-  v.src = seg.take.url;
+  v.muted = muted;
+  v.src = url;
   await once(v, "loadedmetadata");
   if (!Number.isFinite(v.duration)) {
     // MediaRecorder WebM has no duration until seeked to the end.
     v.currentTime = 1e9;
     await once(v, "seeked").catch(() => {});
   }
-  v.currentTime = seg.from;
+  v.currentTime = at;
   // Some browsers skip "seeked" when already at that time; the frame is ready either way.
   await once(v, "seeked", 3000).catch(() => {});
   return v;
+}
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.src = src;
+  await img.decode();
+  return img;
 }
 
 function fontFamily() {
@@ -81,12 +105,32 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.roundRect(x, y, w, h, r);
 }
 
+type Media = HTMLVideoElement | HTMLImageElement;
+const mediaSize = (m: Media) =>
+  m instanceof HTMLVideoElement ? [m.videoWidth || 1, m.videoHeight || 1] : [m.naturalWidth || 1, m.naturalHeight || 1];
+
+/** Draws media to fill a rectangle (cropping the excess), scaled around its centre. */
+function drawCover(ctx: CanvasRenderingContext2D, m: Media, x: number, y: number, w: number, h: number, scale = 1) {
+  const [mw, mh] = mediaSize(m);
+  const s = Math.max(w / mw, h / mh) * scale;
+  const dw = mw * s, dh = mh * s;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.drawImage(m, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  ctx.restore();
+}
+
+const overlayKey = (o: Overlay) => (o.kind === "extra" ? `extra:${o.extraId}` : `shot:${o.from.shot}`);
+
 /** Renders the edit to a single video file in real time. */
 export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
   const { width: W, height: H } = FORMATS[o.format];
+  const seq = o.edit.sequence;
   const mime = outputType();
   if (!mime) throw new Error("This browser can’t create videos. Try the latest Chrome, Edge or Safari.");
-  if (!o.segments.length) throw new Error("Keep at least one take first.");
+  if (!seq.length) throw new Error("Keep at least one take first.");
 
   const canvas = o.canvas;
   canvas.width = W;
@@ -95,11 +139,33 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
   const font = fontFamily();
   await document.fonts.load(`800 80px ${font}`).catch(() => {});
 
-  const total = timelineSeconds(o.segments);
-  const videos = await Promise.all(o.segments.map(prepareVideo));
-  const chunks = o.segments.map((s) => captionChunks(s.words));
+  // ---------- media ----------
+  const videos = await Promise.all(seq.map((s) => prepareVideo(s.take.url, s.from)));
+  const overlayMedia = new Map<string, Media>();
+  for (const s of seq) {
+    for (const ov of s.overlays) {
+      const key = overlayKey(ov);
+      if (overlayMedia.has(key)) continue;
+      if (ov.kind === "segment") overlayMedia.set(key, await prepareVideo(ov.from.take.url, ov.from.from, true));
+      else {
+        const extra = o.extras.find((e) => e.id === ov.extraId);
+        if (!extra) continue;
+        overlayMedia.set(key, extra.kind === "image" ? await loadImage(extra.url) : await prepareVideo(extra.url, 0, true));
+      }
+    }
+  }
+  const [logoLight, logoDark] = o.brand
+    ? await Promise.all([loadImage("/brand/edai-wordmark-black-on-light.jpg"), loadImage("/brand/edai-wordmark-white-on-dark.jpg")])
+    : [null, null];
 
-  // Audio: every clip → its level-matching gain → voice bus; music → ducking gain; both → recorder.
+  const chunks = seq.map((s) => {
+    const indexed = s.words.map((w, idx) => ({ ...w, idx }));
+    return captionChunks(indexed) as (TimedWord & { idx: number })[][];
+  });
+  const seqSeconds = seq.reduce((t, s) => t + (s.to - s.from), 0);
+  const total = seqSeconds + (o.brand ? END_CARD_SECONDS : 0);
+
+  // ---------- audio: clips → level match → voice bus; music → ducking; both → peak limiter → recorder ----------
   const audio = new AudioContext({ sampleRate: 48000 });
   await audio.resume();
   const dest = audio.createMediaStreamDestination();
@@ -116,7 +182,7 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
   voiceBus.connect(limiter);
   const segGains = videos.map((v, i) => {
     const g = audio.createGain();
-    g.gain.value = o.segments[i].gain;
+    g.gain.value = seq[i].gain;
     audio.createMediaElementSource(v).connect(g).connect(voiceBus);
     return g;
   });
@@ -136,27 +202,143 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
   document.addEventListener("visibilitychange", onHidden);
   o.signal.addEventListener("abort", () => fail("Cancelled."), { once: true });
 
-  // ---------- drawing ----------
-  const drawFrame = (i: number, local: number, elapsed: number) => {
-    const seg = o.segments[i];
-    const v = videos[i];
-    const into = local - seg.from; // seconds into this segment
-    const p = (seg.to - seg.from) > 0 ? into / (seg.to - seg.from) : 0;
-    const segChunks = chunks[i];
-    const chunkIdx = segChunks.findIndex((c) => local < c[c.length - 1].end);
-    const activeChunk = chunkIdx >= 0 ? segChunks[chunkIdx] : null;
+  // ---------- layout ----------
+  const panelW = Math.round(W * 0.3);
+  const panelH = logoLight ? Math.round((panelW * logoLight.naturalHeight) / logoLight.naturalWidth) : 0;
+  // Brand clear space: at least one capital "E" height of the wordmark (about 18% of the panel width)
+  // around the panel — from the frame edge and before the hook title.
+  const clearSpace = Math.round(panelW * 0.2);
+  const margin = Math.max(Math.round(W * 0.06), clearSpace);
+  const hookTop = o.brand ? margin + panelH + clearSpace : Math.round(H * 0.12);
+  const captionY = H * (o.format === "9:16" ? 0.7 : 0.78);
 
-    // Slow push in/out, a punch-in on the hook, and jump-cut style zoom on alternate caption chunks.
+  // ---------- drawing helpers ----------
+  const drawOverlay = (ov: Overlay, into: number) => {
+    const m = overlayMedia.get(overlayKey(ov));
+    if (!m) return;
+    const t = into - ov.at;
+    const alpha = Math.min(clamp01(t / FADE), clamp01((ov.seconds - t) / FADE));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (ov.style === "full") {
+      drawCover(ctx, m, 0, 0, W, H, 1.06 - 0.06 * clamp01(t / ov.seconds));
+    } else {
+      // Picture-in-picture card, springing in.
+      const [mw, mh] = mediaSize(m);
+      const aspect = Math.min(1.6, Math.max(0.75, mw / mh));
+      const cw = W * 0.64, ch = cw / aspect;
+      const s = 0.82 + 0.18 * back(t / 0.35);
+      const cx = W / 2, cy = H * 0.17 + ch / 2;
+      ctx.translate(cx, cy);
+      ctx.scale(s, s);
+      ctx.shadowColor = "rgba(0,0,0,.35)";
+      ctx.shadowBlur = 40;
+      ctx.fillStyle = "#fff";
+      roundRect(ctx, -cw / 2 - 10, -ch / 2 - 10, cw + 20, ch + 20, 30);
+      ctx.fill();
+      ctx.shadowColor = "transparent";
+      ctx.save();
+      roundRect(ctx, -cw / 2, -ch / 2, cw, ch, 22);
+      ctx.clip();
+      drawCover(ctx, m, -cw / 2, -ch / 2, cw, ch, 1.04 - 0.04 * clamp01(t / ov.seconds));
+      ctx.restore();
+    }
+    ctx.restore();
+  };
+
+  const drawCallout = (c: ComposedSegment["callouts"][number], into: number, lower: boolean) => {
+    const t = into - c.at;
+    const s = back(t / 0.28);
+    const alpha = clamp01((c.seconds - t) / 0.2);
+    const stat = c.style === "stat";
+    const size = Math.round(W * (stat ? 0.085 : 0.045));
+    ctx.save();
+    ctx.font = `800 ${size}px ${font}`;
+    const text = stat ? c.text : c.text.toUpperCase();
+    const tw = Math.min(ctx.measureText(text).width, W * 0.8);
+    const padX = size * (stat ? 0.55 : 0.6), padY = size * (stat ? 0.35 : 0.45);
+    const y = lower ? H * 0.55 : H * (stat ? 0.3 : 0.27);
+    ctx.globalAlpha = alpha;
+    ctx.translate(W / 2, y);
+    ctx.scale(s, s);
+    ctx.fillStyle = stat ? BRAND : "#fff";
+    roundRect(ctx, -tw / 2 - padX, -size / 2 - padY, tw + padX * 2, size + padY * 2, stat ? size * 0.4 : size);
+    ctx.fill();
+    ctx.fillStyle = stat ? "#fff" : "#0B0B0A";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 0, 0, W * 0.8);
+    ctx.restore();
+  };
+
+  const drawCaptions = (i: number, local: number) => {
+    const seg = seq[i];
+    const active = chunks[i].find((c) => local < c[c.length - 1].end);
+    if (!active || local < active[0].start - 0.05) return;
+    let size = Math.round(W * (o.format === "9:16" ? 0.074 : 0.062));
+    ctx.font = `800 ${size}px ${font}`;
+    const words = active.map((w) => w.word.toUpperCase().replace(/[“”"]/g, ""));
+    const gap = size * 0.28;
+    let widths = words.map((w) => ctx.measureText(w).width);
+    let lineW = widths.reduce((a, b) => a + b, 0) + gap * (words.length - 1);
+    if (lineW > W * 0.86) {
+      size = Math.floor((size * (W * 0.86)) / lineW);
+      ctx.font = `800 ${size}px ${font}`;
+      widths = words.map((w) => ctx.measureText(w).width);
+      lineW = widths.reduce((a, b) => a + b, 0) + gap * (words.length - 1);
+    }
+    let x = (W - lineW) / 2;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    active.forEach((w, k) => {
+      const on = local >= w.start && local < w.end;
+      const emph = seg.emphasis.has(w.idx);
+      const pop = on ? 1 + (emph ? 0.3 : 0.16) * (1 - ease((local - w.start) / 0.16)) : 1;
+      ctx.save();
+      ctx.translate(x + widths[k] / 2, captionY);
+      ctx.scale(pop, pop);
+      if (on) {
+        // The current word sits on a brand pill so it reads on any footage.
+        const padX = size * 0.22, padY = size * 0.14;
+        ctx.fillStyle = BRAND;
+        roundRect(ctx, -widths[k] / 2 - padX, -size / 2 - padY, widths[k] + padX * 2, size + padY * 2, size * 0.22);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+      } else {
+        ctx.lineWidth = size * 0.16;
+        ctx.strokeStyle = "rgba(0,0,0,.9)";
+        ctx.strokeText(words[k], -widths[k] / 2, 0);
+        ctx.fillStyle = emph ? BRAND : "#fff";
+      }
+      ctx.fillText(words[k], -widths[k] / 2, 0);
+      ctx.restore();
+      x += widths[k] + gap;
+    });
+  };
+
+  const drawFrame = (i: number, local: number, elapsed: number) => {
+    const seg = seq[i];
+    const v = videos[i];
+    const into = local - seg.from;
+    const len = seg.to - seg.from;
+    const p = len > 0 ? into / len : 0;
+
+    // Camera: slow push in/out, a punch-in on the hook and on emphasised words, jump-cut zoom between phrases.
+    const chunkIdx = chunks[i].findIndex((c) => local < c[c.length - 1].end);
     let scale = i % 2 === 0 ? 1 + 0.05 * p : 1.05 - 0.05 * p;
     if (i === 0) scale *= 1 + 0.14 * (1 - ease(into / 0.4));
     if (seg.speech && chunkIdx > 0 && chunkIdx % 2 === 1) scale *= 1.06;
+    const emphWord = seg.words.find((w, idx) => seg.emphasis.has(idx) && local >= w.start && local < w.end + 0.25);
+    if (emphWord) scale *= 1 + 0.08 * ease((local - emphWord.start) / 0.12);
 
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
-    const vw = v.videoWidth || W, vh = v.videoHeight || H;
-    const cover = Math.max(W / vw, H / vh) * scale;
-    const dw = vw * cover, dh = vh * cover;
-    ctx.drawImage(v, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    drawCover(ctx, v, 0, 0, W, H, scale);
+
+    // Cutaways and picture-in-picture over the voice.
+    const activeOverlays = seg.overlays.filter((ov) => into >= ov.at && into < ov.at + ov.seconds);
+    activeOverlays.filter((ov) => ov.style === "full").forEach((ov) => drawOverlay(ov, into));
 
     // Flash on each cut.
     if (i > 0 && into < 0.12) {
@@ -164,8 +346,26 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
       ctx.fillRect(0, 0, W, H);
     }
 
+    activeOverlays.filter((ov) => ov.style === "pip").forEach((ov) => drawOverlay(ov, into));
+    const pipUp = activeOverlays.some((ov) => ov.style === "pip");
+    seg.callouts.filter((c) => into >= c.at && into < c.at + c.seconds).forEach((c) => drawCallout(c, into, pipUp));
+
+    // EdAI logo in a protected panel, top-left, over the opening.
+    if (logoLight && elapsed < HOOK_FOR) {
+      const a = Math.min(ease((elapsed - 0.15) / 0.3), clamp01((HOOK_FOR - elapsed) / 0.25));
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.save();
+      roundRect(ctx, margin, margin, panelW, panelH, 18);
+      ctx.clip();
+      ctx.drawImage(logoLight, margin, margin, panelW, panelH);
+      ctx.restore();
+      ctx.fillStyle = BRAND;
+      ctx.fillRect(margin + 18, margin + panelH - 6, Math.round(panelW * 0.16), 4);
+      ctx.restore();
+    }
+
     // Hook title over the opening.
-    const HOOK_FOR = 2.6;
     if (o.hookTitle && elapsed < HOOK_FOR) {
       const inP = ease(elapsed / 0.35);
       const outP = elapsed > HOOK_FOR - 0.25 ? 1 - (elapsed - (HOOK_FOR - 0.25)) / 0.25 : 1;
@@ -176,7 +376,7 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
       const boxW = Math.min(W * 0.88, Math.max(...lines.map((l) => ctx.measureText(l).width)) + size * 1.4);
       const boxH = lines.length * lh + size * 1.1;
       const x = (W - boxW) / 2;
-      const y = H * 0.12 - 40 * (1 - inP);
+      const y = hookTop - 40 * (1 - inP);
       ctx.save();
       ctx.globalAlpha = inP * outP;
       ctx.fillStyle = "rgba(11,11,10,.82)";
@@ -191,62 +391,77 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
       ctx.restore();
     }
 
-    // Word-by-word captions: the current word pops in the brand colour.
+    // Word-by-word captions (held back while the hook title is up).
     const titleUp = Boolean(o.hookTitle) && elapsed < HOOK_FOR;
-    if (o.captions && !titleUp && activeChunk && local >= activeChunk[0].start - 0.05) {
-      let size = Math.round(W * (o.format === "9:16" ? 0.074 : 0.062));
-      ctx.font = `800 ${size}px ${font}`;
-      const words = activeChunk.map((w) => w.word.toUpperCase().replace(/[“”"]/g, ""));
-      const gap = size * 0.28;
-      let widths = words.map((w) => ctx.measureText(w).width);
-      let lineW = widths.reduce((a, b) => a + b, 0) + gap * (words.length - 1);
-      if (lineW > W * 0.86) {
-        size = Math.floor(size * (W * 0.86) / lineW);
-        ctx.font = `800 ${size}px ${font}`;
-        widths = words.map((w) => ctx.measureText(w).width);
-        lineW = widths.reduce((a, b) => a + b, 0) + gap * (words.length - 1);
-      }
-      const y = H * (o.format === "9:16" ? 0.7 : 0.78);
-      let x = (W - lineW) / 2;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.lineJoin = "round";
-      activeChunk.forEach((w: TimedWord, k) => {
-        const active = local >= w.start && local < w.end;
-        const pop = active ? 1 + 0.16 * (1 - ease((local - w.start) / 0.14)) : 1;
-        ctx.save();
-        ctx.translate(x + widths[k] / 2, y);
-        ctx.scale(pop, pop);
-        if (active) {
-          // The current word sits on a brand pill so it reads on any footage.
-          const padX = size * 0.22, padY = size * 0.14;
-          ctx.fillStyle = BRAND;
-          roundRect(ctx, -widths[k] / 2 - padX, -size / 2 - padY, widths[k] + padX * 2, size + padY * 2, size * 0.22);
-          ctx.fill();
-        } else {
-          ctx.lineWidth = size * 0.16;
-          ctx.strokeStyle = "rgba(0,0,0,.9)";
-          ctx.strokeText(words[k], -widths[k] / 2, 0);
-        }
-        ctx.fillStyle = "#fff";
-        ctx.fillText(words[k], -widths[k] / 2, 0);
-        ctx.restore();
-        x += widths[k] + gap;
-      });
-    }
+    if (o.captions && !titleUp) drawCaptions(i, local);
+  };
+
+  /** EdAI end card: white wordmark on black, the call to action, and the tagline bottom-centre. */
+  const drawEndCard = (t: number) => {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+    if (!logoDark) return;
+    const lw = W * 0.7, lh = (lw * logoDark.naturalHeight) / logoDark.naturalWidth;
+    const s = 0.94 + 0.06 * ease(t / 0.5);
+    ctx.save();
+    ctx.globalAlpha = ease(t / 0.4);
+    ctx.translate(W / 2, H * 0.4);
+    ctx.scale(s, s);
+    ctx.drawImage(logoDark, -lw / 2, -lh / 2, lw, lh);
+    ctx.restore();
+
+    const ctaSize = Math.round(W * 0.052);
+    ctx.save();
+    ctx.globalAlpha = ease((t - 0.35) / 0.4);
+    ctx.font = `600 ${ctaSize}px ${font}`;
+    ctx.fillStyle = CREAM;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(o.edit.endCta, W / 2, H * 0.4 + lh / 2 + ctaSize * 0.6 + 24 * (1 - ease((t - 0.35) / 0.4)), W * 0.86);
+    ctx.restore();
+
+    // Tagline in the footer zone, above the platform's on-screen buttons.
+    const tagSize = Math.round(W * 0.034);
+    const tagY = H * (o.format === "9:16" ? 0.8 : 0.86);
+    ctx.save();
+    ctx.globalAlpha = ease((t - 0.7) / 0.4);
+    ctx.fillStyle = BRAND;
+    ctx.fillRect(W / 2 - 28, tagY - tagSize * 1.4, 56, 4);
+    ctx.font = `500 ${tagSize}px ${font}`;
+    ctx.fillStyle = CREAM;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "1px";
+    ctx.fillText(TAGLINE, W / 2, tagY, W * 0.9);
+    ctx.restore();
   };
 
   // ---------- playback ----------
   let elapsedBefore = 0;
-  const musicStart = audio.currentTime + 0.05;
-  scheduleMusic(audio, musicBus, musicStart, total + 1, o.music);
-
-  drawFrame(0, o.segments[0].from, 0);
+  scheduleMusic(audio, musicBus, audio.currentTime + 0.05, total + 1, o.music);
+  drawFrame(0, seq[0].from, 0);
   recorder.start(1000);
 
+  const playing = new Set<HTMLVideoElement>();
+  const syncOverlayPlayback = (seg: ComposedSegment, into: number) => {
+    for (const ov of seg.overlays) {
+      const m = overlayMedia.get(overlayKey(ov));
+      if (!(m instanceof HTMLVideoElement)) continue;
+      const on = into >= ov.at && into < ov.at + ov.seconds;
+      if (on && !playing.has(m)) {
+        playing.add(m);
+        m.currentTime = ov.kind === "segment" ? ov.from.from : 0;
+        m.play().catch(() => {});
+      } else if (!on && playing.has(m) && !seg.overlays.some((x) => x !== ov && overlayKey(x) === overlayKey(ov) && into >= x.at && into < x.at + x.seconds)) {
+        playing.delete(m);
+        m.pause();
+      }
+    }
+  };
+
   try {
-    for (let i = 0; i < o.segments.length; i++) {
-      const seg = o.segments[i];
+    for (let i = 0; i < seq.length; i++) {
+      const seg = seq[i];
       const v = videos[i];
       // Music sits under speech and comes up in the gaps.
       const level = o.music === "No music" ? 0 : seg.speech ? 0.35 : 1;
@@ -258,6 +473,7 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
         const tick = () => {
           if (abortReason) return resolve();
           const local = v.currentTime;
+          syncOverlayPlayback(seg, local - seg.from);
           drawFrame(i, Math.min(local, seg.to), elapsedBefore + (local - seg.from));
           o.onProgress(Math.min(0.99, (elapsedBefore + (local - seg.from)) / total));
           if (local >= seg.to - 0.02 || v.ended) return resolve();
@@ -266,10 +482,28 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
         requestAnimationFrame(tick);
       });
       v.pause();
+      playing.forEach((m) => m.pause());
+      playing.clear();
       if (abortReason) break;
       elapsedBefore += seg.to - seg.from;
     }
-    // Let the last frame and the music tail settle.
+
+    if (o.brand && !abortReason) {
+      musicBus.gain.setTargetAtTime(o.music === "No music" ? 0 : 1, audio.currentTime, 0.1);
+      const start = performance.now();
+      await new Promise<void>((resolve) => {
+        const tick = () => {
+          if (abortReason) return resolve();
+          const t = (performance.now() - start) / 1000;
+          drawEndCard(t);
+          o.onProgress(Math.min(0.99, (seqSeconds + t) / total));
+          if (t >= END_CARD_SECONDS) return resolve();
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+    // Let the music tail settle.
     musicBus.gain.setTargetAtTime(0, audio.currentTime, 0.15);
     await new Promise((r) => setTimeout(r, 400));
   } finally {
@@ -277,7 +511,12 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
     await stopped;
     document.removeEventListener("visibilitychange", onHidden);
     stream.getTracks().forEach((t) => t.stop());
-    videos.forEach((v) => (v.removeAttribute("src"), v.load()));
+    [...videos, ...overlayMedia.values()].forEach((m) => {
+      if (m instanceof HTMLVideoElement) {
+        m.removeAttribute("src");
+        m.load();
+      }
+    });
     audio.close().catch(() => {});
   }
 

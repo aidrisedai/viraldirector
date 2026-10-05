@@ -45,12 +45,22 @@ export function detectSpeech(samples: Float32Array, sampleRate: number): SpeechA
 
 export type TimedWord = { word: string; start: number; end: number };
 
+/** Splits caption text into words, attaching stray punctuation ("—", "-", "…") to the word before it. */
+export function captionWords(text: string): string[] {
+  const out: string[] = [];
+  for (const token of text.replace(/[“”"]/g, "").split(/\s+/).filter(Boolean)) {
+    if (/[\p{L}\p{N}]/u.test(token)) out.push(token);
+    else if (out.length) out[out.length - 1] += ` ${token}`;
+  }
+  return out;
+}
+
 /**
  * Spreads words across [start, end], weighting each by its length plus a pause after punctuation.
  * Without word-level timestamps this keeps captions close to the speech for short lines.
  */
 export function timeWords(text: string, start: number, end: number): TimedWord[] {
-  const words = text.replace(/[“”"]/g, "").split(/\s+/).filter(Boolean);
+  const words = captionWords(text);
   if (!words.length || end <= start) return [];
   const weight = (w: string) => w.replace(/[^\p{L}\p{N}]/gu, "").length + 2 + (/[.,!?;:—–-]$/.test(w) ? 3 : 0);
   const total = words.reduce((t, w) => t + weight(w), 0);
@@ -78,6 +88,35 @@ export function captionChunks(words: TimedWord[], max = 3): TimedWord[][] {
   return chunks;
 }
 
+/** Whisper word chunks ({ text, timestamp: [start, end|null] }) → timed words relative to the clip. */
+export function wordsFromChunks(chunks: { text: string; timestamp: [number, number | null] }[]): TimedWord[] {
+  const out: TimedWord[] = [];
+  chunks.forEach((c, i) => {
+    const word = c.text.trim();
+    if (!word) return;
+    const start = c.timestamp[0];
+    const next = chunks[i + 1]?.timestamp[0];
+    const end = c.timestamp[1] ?? (next !== undefined ? next : start + 0.4);
+    out.push({ word, start, end: Math.max(end, start + 0.05) });
+  });
+  return out;
+}
+
+/**
+ * Times caption text that a creator may have edited. With exact word times and the same word
+ * count, each word keeps its timing; otherwise the words are spread across the speech.
+ */
+export function retimeWords(text: string, exact: TimedWord[] | null, onset: number | null, offset: number | null): TimedWord[] {
+  const words = captionWords(text);
+  if (!words.length) return [];
+  if (exact?.length) {
+    if (exact.length === words.length) return exact.map((w, i) => ({ ...w, word: words[i] }));
+    return timeWords(words.join(" "), exact[0].start, exact[exact.length - 1].end);
+  }
+  if (onset === null || offset === null) return [];
+  return timeWords(words.join(" "), onset, offset);
+}
+
 // ---------- Timeline ----------
 
 export type Segment = {
@@ -100,27 +139,40 @@ const TAIL = 0.3; // and let the last word land
 // Speech level that lands near the loudness social platforms play at (about −14 to −16 LUFS for voice).
 const TARGET_RMS = 0.25;
 
+/** Caption text for a kept take: the creator's edit, else what was said, else the script. */
+export function captionText(take: Take, shot: Shot, edited?: string): string {
+  if (!shot.line.trim() && !edited?.trim()) return "";
+  return (edited?.trim() || take.transcript?.trim() || shot.line).trim();
+}
+
 /** Builds the edit: kept takes in script order, trimmed, with timed captions and level matching. */
-export function buildTimeline(plan: Plan, kept: (Take | undefined)[], analyses: Map<string, SpeechAnalysis>): Segment[] {
+export function buildTimeline(
+  plan: Plan,
+  kept: (Take | undefined)[],
+  analyses: Map<string, SpeechAnalysis>,
+  edits: Record<string, string> = {},
+): Segment[] {
   const segments: Segment[] = [];
   plan.shots.forEach((shot, i) => {
     const take = kept[i];
     if (!take) return;
     const a = analyses.get(take.id);
     const length = a?.duration && Number.isFinite(a.duration) ? a.duration : take.seconds;
-    const hasLine = shot.line.trim().length > 0;
-    const speech = hasLine && a?.onset != null && a.offset != null;
+    const text = captionText(take, shot, edits[take.id]);
+    // Exact word times (from speech recognition) beat the level-based estimate.
+    const exact = take.words?.length ? take.words : null;
+    const onset = exact ? exact[0].start : (a?.onset ?? null);
+    const offset = exact ? exact[exact.length - 1].end : (a?.offset ?? null);
+    const speech = text.length > 0 && onset !== null && offset !== null;
 
     let from = 0, to = length;
     if (speech) {
-      from = Math.max(0, a!.onset! - LEAD);
-      to = Math.min(length, a!.offset! + TAIL);
+      from = Math.max(0, onset! - LEAD);
+      to = Math.min(length, offset! + TAIL);
     }
     if (to - from < 0.5) { from = 0; to = length; } // never trim a clip to nothing
 
-    // Prefer what was actually said; fall back to the script.
-    const text = hasLine ? (take.transcript?.trim() || shot.line) : "";
-    const words = speech ? timeWords(text, a!.onset!, Math.min(a!.offset!, to)) : [];
+    const words = speech ? retimeWords(text, exact, onset, Math.min(offset!, to)) : [];
     const gain = a?.speechRms ? Math.min(8, Math.max(0.25, TARGET_RMS / a.speechRms)) : 1;
 
     segments.push({ shot: i, take, kind: shot.type, from, to, words, gain, speech });

@@ -4,15 +4,27 @@ import { Button } from "@/components/ds/Button";
 import { Icon } from "@/components/ds/Icon";
 import type { ChatRequest, ChatResponse } from "@/lib/chat";
 import { buildTimeline, FORMATS, MUSIC_STYLES, type FormatKey, type MusicStyle, type SpeechAnalysis } from "@/lib/edit";
+import { composeEdit, fallbackPlan, normalizePlan, timelineForDirector, type EditRequest, type EditResponse } from "@/lib/editPlan";
 import { plannedSeconds, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/plan";
 import { exportChecks, scriptText, slug, takeFileName, type Take } from "@/lib/takes";
 import { Chips } from "./Chips";
+import { CaptionsCard } from "./export/CaptionsCard";
+import { ExtrasCard } from "./export/ExtrasCard";
+import type { ExportState } from "./export/useExportState";
+import { extraThumb } from "./render/media";
 import { analyzeTake } from "./render/analyze";
 import { outputType, renderVideo } from "./render/renderVideo";
 import { fixDuration } from "./useRecorder";
 import s from "./director.module.css";
 
-type Props = { plan: Plan; brief: Brief; hook: number; kept: (Take | undefined)[]; onGoToShot: (i: number) => void };
+type Props = {
+  plan: Plan;
+  brief: Brief;
+  hook: number;
+  kept: (Take | undefined)[];
+  onGoToShot: (i: number) => void;
+  finish: ExportState;
+};
 
 function download(href: string, filename: string) {
   const a = document.createElement("a");
@@ -32,7 +44,7 @@ type Render =
   | { state: "done"; url: string; blob: Blob; mime: string; seconds: number; format: FormatKey }
   | { state: "error"; message: string };
 
-export function ExportStep({ plan, brief, hook, kept, onGoToShot }: Props) {
+export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Props) {
   const checks = exportChecks(plan, brief, kept);
   const ready = checks.every((c) => c.ok);
   const cut = useMemo(() => kept.flatMap((t, i) => (t ? [{ take: t, shot: plan.shots[i] }] : [])), [kept, plan]);
@@ -60,6 +72,54 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot }: Props) {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const busy = render.state === "preparing" || render.state === "rendering";
+  const hookTitle = plan.hooks[hook].line.replace(/^[“"]|[”"]$/g, "");
+  const signature = kept.map((t) => t?.id ?? "-").join(",");
+  const planStale = !!finish.editPlan && finish.editPlan.signature !== signature;
+  const speaking = cut.flatMap(({ take, shot }) => (shot.line.trim() ? [{ take, shot, index: take.shot }] : []));
+
+  /** The timeline as it stands: exact transcripts and caption edits applied. */
+  const currentTimeline = async () => {
+    const withExact = kept.map((t) => {
+      const ex = t && finish.exact[t.id];
+      return t && ex ? { ...t, transcript: ex.text, words: ex.words } : t;
+    });
+    const analyses = new Map<string, SpeechAnalysis>();
+    for (const { take } of cut) analyses.set(take.id, await analyzeTake(take));
+    return buildTimeline(plan, withExact, analyses, finish.captionEdits);
+  };
+
+  const askForEdit = async (): Promise<string> => {
+    if (!cut.length) return "Keep at least one take first.";
+    const timeline = await currentTimeline();
+    const builtin = () => {
+      finish.setEditPlan({ plan: normalizePlan(fallbackPlan(timeline, finish.extras), timeline, finish.extras), signature, source: "builtin" });
+    };
+    const body: EditRequest = {
+      timeline: timelineForDirector(timeline, plan.shots.map((x) => x.title)),
+      extras: await Promise.all(
+        finish.extras.map(async (e) => ({ id: e.id, kind: e.kind, seconds: e.seconds, note: e.note, thumb: await extraThumb(e) })),
+      ),
+      notes: finish.notes,
+      brand: finish.brand,
+      concept: brief.concept,
+      platform: brief.platform,
+      audience: brief.audience,
+      hook: hookTitle,
+    };
+    try {
+      const res = await fetch("/api/edit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = (await res.json().catch(() => ({ error: "The Director didn’t respond." }))) as EditResponse;
+      if ("error" in data) {
+        builtin();
+        return `${data.error}${res.status === 503 ? "" : " Using the built-in edit for now."}`;
+      }
+      finish.setEditPlan({ plan: normalizePlan(data.plan, timeline, finish.extras), signature, source: "director" });
+      return "";
+    } catch {
+      builtin();
+      return "Couldn’t reach the Director, so the built-in edit is used.";
+    }
+  };
   const fileName = (m: string) => `${slug(brief.concept)}-${format.replace(":", "x")}.${m.includes("mp4") ? "mp4" : "webm"}`;
 
   const create = async () => {
@@ -68,16 +128,19 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot }: Props) {
     abortRef.current = ctrl;
     setRender({ state: "preparing" });
     try {
-      const analyses = new Map<string, SpeechAnalysis>();
-      for (const { take } of cut) analyses.set(take.id, await analyzeTake(take));
-      const segments = buildTimeline(plan, kept, analyses);
+      const timeline = await currentTimeline();
+      // The Director's edit if it matches these takes; otherwise the built-in one.
+      const chosen = finish.editPlan && !planStale ? finish.editPlan.plan : fallbackPlan(timeline, finish.extras);
+      const edit = composeEdit(timeline, normalizePlan(chosen, timeline, finish.extras));
       setRender({ state: "rendering", progress: 0 });
       const result = await renderVideo({
-        segments,
+        edit,
+        extras: finish.extras,
+        brand: finish.brand,
         format,
         music,
         captions,
-        hookTitle: plan.hooks[hook].line.replace(/^[“"]|[”"]$/g, ""),
+        hookTitle,
         canvas: canvasRef.current!,
         onProgress: (progress) => setRender({ state: "rendering", progress }),
         signal: ctrl.signal,
@@ -200,12 +263,17 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot }: Props) {
             ))}
           </div>
 
+          <CaptionsCard clips={speaking} state={finish} />
+          <ExtrasCard state={finish} onPlan={askForEdit} planStale={planStale} />
+
           <div className={s.createCard}>
             <div className={s.stack} style={{ gap: 4 }}>
               <span className={s.createTitle}>Create your video</span>
               <span className={s.hint}>
-                Your takes in order with dead air trimmed, levels evened out, animated captions, your hook on screen and a music
-                bed under your voice. It plays through once while it’s made — keep this tab open.
+                Your takes in order with dead air trimmed and levels evened out, animated captions, your hook on screen, the
+                Director’s cutaways and callouts, a music bed under your voice
+                {finish.brand ? ", and the EdAI logo and end card" : ""}. It plays through once while it’s made — keep this tab
+                open.
               </span>
             </div>
             <div className={s.stack} style={{ gap: 8 }}>
@@ -215,6 +283,15 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot }: Props) {
             <div className={s.stack} style={{ gap: 8 }}>
               <span className={s.label}>Music</span>
               <Chips label="Music" options={MUSIC_STYLES} isOn={(m) => m === music} onToggle={setMusic} />
+            </div>
+            <div className={s.stack} style={{ gap: 8 }}>
+              <span className={s.label}>EdAI branding</span>
+              <Chips
+                label="EdAI branding"
+                options={["On", "Off"] as const}
+                isOn={(c) => (c === "On") === finish.brand}
+                onToggle={(c) => finish.setBrand(c === "On")}
+              />
             </div>
             <div className={s.stack} style={{ gap: 8 }}>
               <span className={s.label}>Captions</span>

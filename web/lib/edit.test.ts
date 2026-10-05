@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTimeline, captionChunks, detectSpeech, timeWords, timelineSeconds, type SpeechAnalysis } from "./edit";
+import { buildTimeline, captionChunks, captionText, captionWords, detectSpeech, retimeWords, timeWords, timelineSeconds, wordsFromChunks, type SpeechAnalysis } from "./edit";
 import { SAMPLE_PLAN } from "./plan";
 import type { Take } from "./takes";
 
@@ -94,5 +94,64 @@ describe("buildTimeline", () => {
 
   it("totals the edited length", () => {
     expect(timelineSeconds(buildTimeline(SAMPLE_PLAN, kept, analyses))).toBeCloseTo(3.02 + 7.98 + 3.2, 1);
+  });
+});
+
+describe("exact captions", () => {
+  it("turns Whisper word chunks into timed words, filling a missing end", () => {
+    const w = wordsFromChunks([
+      { text: " Bad", timestamp: [0.5, 0.8] },
+      { text: " ideas", timestamp: [0.8, 1.2] },
+      { text: " ", timestamp: [1.2, 1.3] },
+      { text: " ship.", timestamp: [1.3, null] },
+    ]);
+    expect(w).toEqual([
+      { word: "Bad", start: 0.5, end: 0.8 },
+      { word: "ideas", start: 0.8, end: 1.2 },
+      { word: "ship.", start: 1.3, end: 1.7000000000000002 },
+    ]);
+  });
+
+  it("keeps exact timings when an edit fixes a word, and spreads them when the count changes", () => {
+    const exact = [
+      { word: "bad", start: 1, end: 1.4 },
+      { word: "ideas", start: 1.4, end: 2 },
+      { word: "teach", start: 2, end: 2.6 },
+    ];
+    expect(retimeWords("Bad ideas taught", exact, null, null).map((w) => [w.word, w.start])).toEqual([
+      ["Bad", 1], ["ideas", 1.4], ["taught", 2],
+    ]);
+    const spread = retimeWords("Bad ideas teach you", exact, null, null);
+    expect(spread).toHaveLength(4);
+    expect(spread[0].start).toBe(1);
+    expect(spread.at(-1)!.end).toBeCloseTo(2.6, 6);
+  });
+
+  it("captions an edit over the clip's real word timings and trims to them", () => {
+    const withWords = take(2, {
+      seconds: 9,
+      words: [
+        { word: "bad", start: 1.0, end: 1.3 },
+        { word: "ideas", start: 1.3, end: 1.8 },
+      ],
+    });
+    const [seg] = buildTimeline(SAMPLE_PLAN, [undefined, undefined, withWords], new Map(), { t2: "Bad ideas" });
+    expect(seg.words.map((w) => [w.word, w.start])).toEqual([["Bad", 1.0], ["ideas", 1.3]]);
+    expect(seg.from).toBeCloseTo(0.88, 6);
+    expect(seg.to).toBeCloseTo(2.1, 6);
+  });
+
+  it("uses the creator's caption edit over the transcript and script", () => {
+    const t = take(2, { transcript: "bad idea teach you" });
+    expect(captionText(t, SAMPLE_PLAN.shots[2], "Bad ideas teach you")).toBe("Bad ideas teach you");
+    expect(captionText(t, SAMPLE_PLAN.shots[2])).toBe("bad idea teach you");
+    expect(captionText(take(3), SAMPLE_PLAN.shots[3])).toBe("");
+  });
+});
+
+describe("captionWords", () => {
+  it("never leaves a dash or ellipsis as its own caption word", () => {
+    expect(captionWords("users actually want — and you … ship “it”")).toEqual(["users", "actually", "want —", "and", "you …", "ship", "it"]);
+    expect(captionWords("— leading dash")).toEqual(["leading", "dash"]);
   });
 });

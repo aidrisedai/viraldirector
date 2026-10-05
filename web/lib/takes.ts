@@ -15,6 +15,8 @@ export type Take = {
   voiced: number | null;
   /** What browser speech recognition heard during the take; null when unavailable. */
   transcript: string | null;
+  /** Word-level timings from on-device speech recognition, relative to the clip; null until run. */
+  words?: { word: string; start: number; end: number }[] | null;
   source: "camera" | "upload";
 };
 

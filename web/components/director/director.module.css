@@ -320,3 +320,21 @@ button.setting { cursor: pointer; }
   border: 1px solid var(--vd-chip-border); border-radius: var(--radius-md); outline: none;
 }
 .captionInput:focus { border-color: var(--brand-accent); box-shadow: 0 0 0 3px var(--focus-ring); }
+
+/* ---------- Extra content ---------- */
+.extraList { display: flex; flex-direction: column; gap: 12px; }
+.extraItem { display: flex; gap: 12px; align-items: flex-start; }
+.extraThumb {
+  flex: none; width: 64px; height: 64px; border-radius: var(--radius-md); overflow: hidden; background: var(--vd-hairline-soft);
+}
+.extraThumb img, .extraThumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.extraName { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.extraNote {
+  font: inherit; font-size: 14px; padding: 8px 10px; color: var(--black); width: 100%;
+  border: 1px solid var(--vd-chip-border); border-radius: var(--radius-md); outline: none;
+}
+.extraNote:focus { border-color: var(--brand-accent); box-shadow: 0 0 0 3px var(--focus-ring); }
+.planSummary {
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;
+  background: var(--cream-50); border: 1px solid var(--vd-hairline); border-radius: var(--radius-card);
+}

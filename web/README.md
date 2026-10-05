@@ -57,6 +57,7 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 | `ANTHROPIC_WORKSPACE_ID` | Only for unscoped keys | Needed when the key starts with `sk-ant-usr-`. Prefer a workspace-scoped key. |
 | `DIRECTOR_MODEL` | No | Defaults to `claude-opus-5-5`. |
 | `PLAN_RATE_LIMIT` | No | Plans per IP per 10 minutes (default 10). |
+| `EDIT_RATE_LIMIT` | No | Director edit plans per IP per 10 minutes (default 10). |
 | `CHAT_RATE_LIMIT` | No | Questions and feedback requests to the Director per IP per 10 minutes (default 40). |
 | `NEXT_PUBLIC_SITE_URL` | No | Canonical URL for share metadata. |
 
@@ -97,6 +98,23 @@ entirely in the browser — nothing is uploaded:
 
 Rendering is real time (a 45s video takes about 45s) and needs the tab to stay visible.
 
+**Finishing tools on the Export step:**
+
+- **Captions** (`export/CaptionsCard.tsx`): captions follow what was actually said, not the script — the browser's
+  transcript where available, editable per clip, with the script shown when they differ. **Get exact captions** runs
+  Whisper (`Xenova/whisper-base.en`, transformers.js) on the device for word-level timing; the model (about 80–100 MB)
+  downloads from Hugging Face on first use and is cached. ONNX Runtime's WebAssembly is served from `/ort/`
+  (copied from `node_modules` at build). Footage never leaves the device.
+- **Extra content + the Director's edit** (`export/ExtrasCard.tsx`, `POST /api/edit`, `lib/editPlan.ts`): add up to 6
+  pictures or clips with a note each, plus free-form notes. The Director (Claude, with thumbnails) returns an edit
+  plan — cutaways over the voice (added clips or planned B-roll), picture-in-picture cards, stat/label callouts,
+  emphasised caption words, and the end-card call to action. Plans are clamped to the footage before rendering.
+  Without the Director, a built-in edit lays B-roll over the voice and places added items on the talking parts.
+- **EdAI branding** (on by default): the official wordmark (`public/brand/`, from the `edai-logo` brand skill) in a
+  protected panel top-left over the opening, and an end card with the white wordmark, the call to action and the
+  tagline "Raising Muslim Teens as Builders and Founders" bottom-centre. Per the brand rules there is no watermark
+  and no standalone brandmark.
+
 The plan persists in `localStorage`. Takes stay in memory only, and the page warns before a refresh discards them.
 
 ### Code map
@@ -116,7 +134,8 @@ The plan persists in `localStorage`. Takes stay in memory only, and the page war
 - **Rate limiting is per server instance.** On serverless or multi-instance hosting, also cap `/api/plan` with your
   host's firewall/WAF, or swap `lib/rateLimit.ts` for a shared store. Set a monthly spend limit on the Anthropic key.
 - **No accounts or server storage.** Projects live in one browser; takes are lost on refresh.
-- **Video creation limits:** B-roll plays in sequence rather than layered over the voice; captions are timed by
-  estimate, not word-level speech recognition; 16:9 and 1:1 aren't offered yet; rendering is real time in the tab.
+- **Video creation limits:** exact captions are English-only (whisper-base.en) and need the one-time model
+  download; without them caption timing is estimated from the audio. Cutaway clips are silent under the voice.
+  16:9 and 1:1 aren't offered yet; rendering is real time in the tab.
 - CSP allows `'unsafe-inline'` scripts because Next's App Router inlines bootstrap scripts; move to nonces via
   middleware if you need a strict CSP.

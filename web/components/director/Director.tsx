@@ -8,6 +8,7 @@ import type { Take } from "@/lib/takes";
 import { ConceptStep } from "./ConceptStep";
 import { DirectorProvider } from "./DirectorContext";
 import { DirectorPanel } from "./DirectorPanel";
+import { useExportState } from "./export/useExportState";
 import { ExportStep } from "./ExportStep";
 import { PlanStep } from "./PlanStep";
 import { RecordStep } from "./RecordStep";
@@ -68,6 +69,7 @@ export function Director() {
   );
   const latestTake = useMemo(() => takes.findLast((t) => t.shot === shot), [takes, shot]);
 
+  const finish = useExportState();
   const chat = useDirectorChat({ brief, plan, basePlan, hook, step: STEPS[step - 1], shot });
   const { ask, setOpen: setPanelOpen } = chat;
   const directorActions = useMemo(() => ({ ask, open: () => setPanelOpen(true) }), [ask, setPanelOpen]);
@@ -86,6 +88,7 @@ export function Director() {
       takes.forEach((t) => URL.revokeObjectURL(t.url));
       setTakes([]);
       setKept({});
+      finish.reset();
       setPlan(applyHook(data.plan, 0));
       setBasePlan(applyHook(data.plan, 0));
       setSample(data.sample);
@@ -97,7 +100,7 @@ export function Director() {
     } finally {
       setLoading(false);
     }
-  }, [brief, takes]);
+  }, [brief, takes, finish]);
 
   const pickHook = (i: number) => {
     setHook(i);
@@ -138,6 +141,7 @@ export function Director() {
     setBasePlan(null);
     chat.clear();
     chat.setOpen(false);
+    finish.reset();
     setSample(false);
     setHook(0);
     setShot(0);
@@ -226,7 +230,7 @@ export function Director() {
           askBusy={chat.busy}
         />
       )}
-      {step === 6 && plan && <ExportStep plan={plan} brief={brief} hook={hook} kept={keptTakes} onGoToShot={(i) => { setShot(i); setStep(3); }} />}
+      {step === 6 && plan && <ExportStep plan={plan} brief={brief} hook={hook} kept={keptTakes} onGoToShot={(i) => { setShot(i); setStep(3); }} finish={finish} />}
 
       <DirectorPanel
         open={chat.open}
