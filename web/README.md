@@ -25,15 +25,11 @@ npm run build   # production build (standalone output)
 
 Any Node 20.9+ host works. Camera recording needs HTTPS (browsers block `getUserMedia` on plain HTTP).
 
-**Vercel:** import the repo, set **Root Directory** to `web`, add `ANTHROPIC_API_KEY` under
-Environment Variables (Production), deploy. `/api/plan` declares `maxDuration = 120`; plan generation usually
-takes 20–60s.
-
-**Docker (Fly.io, Render, Railway, Cloud Run, …):**
+The app ships as a standalone Docker image that runs on any container host (Fly.io, Render, Railway, Google Cloud Run, a VPS, …). Set the environment variables below as secrets in the host, never in the repo.
 
 ```bash
 docker build -t viraldirector .
-docker run -p 3000:3000 -e ANTHROPIC_API_KEY=sk-ant-... viraldirector
+docker run -p 3000:3000 --env-file .env.local viraldirector
 ```
 
 Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}`.
@@ -43,6 +39,7 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | For real plans | Server-side key for the Director. Never expose it as `NEXT_PUBLIC_*`. |
+| `ANTHROPIC_WORKSPACE_ID` | Only for unscoped keys | Needed when the key starts with `sk-ant-usr-`. Prefer a workspace-scoped key. |
 | `DIRECTOR_MODEL` | No | Defaults to `claude-opus-5-5`. |
 | `PLAN_RATE_LIMIT` | No | Plans per IP per 10 minutes (default 10). |
 | `NEXT_PUBLIC_SITE_URL` | No | Canonical URL for share metadata. |
