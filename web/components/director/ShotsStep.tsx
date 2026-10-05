@@ -2,6 +2,7 @@ import { Fragment, useRef, useState } from "react";
 import { Button } from "@/components/ds/Button";
 import { recordingMinutes, SHOT_TYPE_LABEL, type Plan } from "@/lib/plan";
 import type { Take } from "@/lib/takes";
+import { Term } from "./Term";
 import { takeFromFile } from "./useRecorder";
 import s from "./director.module.css";
 
@@ -13,11 +14,13 @@ type Props = {
   onEditLine: (i: number, line: string) => void;
   onRecord: () => void;
   onUpload: (take: Take) => void;
+  onAskLine: (shot: number) => void;
+  askBusy: boolean;
 };
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
-export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, onUpload }: Props) {
+export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, onUpload, onAskLine, askBusy }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -86,13 +89,16 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, 
 
           <div className={s.detail}>
             <div className={s.stack} style={{ gap: 8 }}>
-              <span className={s.eyebrow}>SHOT {shot + 1} · {SHOT_TYPE_LABEL[cur.type].toUpperCase()}</span>
+              <span className={s.eyebrow}>
+                SHOT {shot + 1} · <Term word={SHOT_TYPE_LABEL[cur.type]}>{SHOT_TYPE_LABEL[cur.type].toUpperCase()}</Term> ·{" "}
+                <Term word={cur.size}>{cur.size.toUpperCase()}</Term>
+              </span>
               <h2 className={s.h2}>{cur.title}</h2>
             </div>
             <div className={s.specs}>
-              <div className={s.spec}><span className={s.small}>Framing</span><span>{cur.framing}</span></div>
-              <div className={s.spec}><span className={s.small}>Lighting</span><span>{cur.lighting}</span></div>
-              <div className={s.spec}><span className={s.small}>Delivery</span><span>{cur.delivery}</span></div>
+              <div className={s.spec}><span className={s.small}><Term word="Framing" /></span><span>{cur.framing}</span></div>
+              <div className={s.spec}><span className={s.small}><Term word="Lighting" /></span><span>{cur.lighting}</span></div>
+              <div className={s.spec}><span className={s.small}><Term word="Delivery" /></span><span>{cur.delivery}</span></div>
               <div className={s.spec}><span className={s.small}>Duration</span><span>{cur.seconds}s</span></div>
             </div>
             <div className={s.lineBlock}>
@@ -115,6 +121,11 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, 
               ) : (
                 <span className={s.serifLine}>{cur.line || <span className={s.muted}>No line — {cur.delivery}</span>}</span>
               )}
+              <div>
+                <Button variant="outline" size="sm" icon="message" onClick={() => onAskLine(shot)} disabled={askBusy}>
+                  {editing ? "Ask the Director about my edit" : "Ask the Director about this line"}
+                </Button>
+              </div>
             </div>
             <div className={s.actions}>
               <Button size="lg" icon="video" onClick={onRecord}>{kept[shot] ? "Record again" : "Record this shot"}</Button>

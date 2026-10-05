@@ -7,7 +7,7 @@ const broll = SAMPLE_PLAN.shots[3]; // 3s, no line
 
 const take = (over: Partial<Take> = {}): Take => ({
   id: "t", shot: 2, url: "blob:x", blob: new Blob(), mime: "video/webm",
-  seconds: 7.8, peak: 0.6, clipped: 0, voiced: 0.7, source: "camera", ...over,
+  seconds: 7.8, peak: 0.6, clipped: 0, voiced: 0.7, transcript: null, source: "camera", ...over,
 });
 
 describe("reviewTake", () => {

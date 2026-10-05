@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ds/Badge";
 import { Button } from "@/components/ds/Button";
 import { beatRanges, plannedSeconds, targetSeconds, type Brief, type Plan } from "@/lib/plan";
+import { Term } from "./Term";
 import s from "./director.module.css";
 
 // Beat bar shades cycle through the brand's ink tones after the emerald hook.
@@ -46,7 +47,7 @@ export function PlanStep({ plan, brief, sample, hook, onPickHook, onNext }: Prop
         <div className={s.stack} style={{ gap: 24 }}>
           <div className={`${s.card} ${s.stack}`} style={{ padding: 24, gap: 16 }}>
             <div className={s.beatHead}>
-              <span style={{ fontSize: 17, fontWeight: 600 }}>Beat sheet</span>
+              <span style={{ fontSize: 17, fontWeight: 600 }}><Term word="Beat sheet" /></span>
               <span className={s.muted} style={{ fontSize: 14 }}>
                 {targetSeconds(brief)}s target · {plannedSeconds(plan)}s planned
               </span>
@@ -61,7 +62,9 @@ export function PlanStep({ plan, brief, sample, hook, onPickHook, onNext }: Prop
           <div className={`${s.card} ${s.stack}`} style={{ padding: "8px 24px" }}>
             {plan.beats.map((b, i) => (
               <div key={i} className={s.beatRow}>
-                <span className={`${s.beatLabel} ${i === 0 ? s.beatLabelHook : ""}`}>{b.label.toUpperCase()}</span>
+                <span className={`${s.beatLabel} ${i === 0 ? s.beatLabelHook : ""}`}>
+                  <Term word={b.label.replace(/\s*[×x]\s*\d+$/, "")}>{b.label.toUpperCase()}</Term>
+                </span>
                 <span style={{ fontSize: 15, lineHeight: 1.5 }}>{b.line}</span>
                 <span className={s.beatTime}>{ranges[i]}</span>
               </div>

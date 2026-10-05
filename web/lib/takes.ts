@@ -13,6 +13,8 @@ export type Take = {
   clipped: number | null;
   /** Share of the take with speech-level audio, 0–1; null for uploads. */
   voiced: number | null;
+  /** What browser speech recognition heard during the take; null when unavailable. */
+  transcript: string | null;
   source: "camera" | "upload";
 };
 

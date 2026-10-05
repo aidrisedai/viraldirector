@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { DirectorError, directorConfigured, generatePlan } from "@/lib/director";
 import { BriefSchema, SAMPLE_PLAN, type PlanResponse } from "@/lib/plan";
+import { clientIp } from "@/lib/clientIp";
 import { createRateLimiter } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
@@ -13,18 +14,6 @@ const limiter = createRateLimiter({
 
 const json = (body: PlanResponse, status = 200, headers?: HeadersInit) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store", ...headers } });
-
-/**
- * The edge proxy (Railway, or any single reverse proxy) sets X-Real-IP and appends the address it
- * saw to X-Forwarded-For. Earlier X-Forwarded-For entries come from the client and can be forged,
- * so never key the rate limit on them.
- */
-function clientIp(req: NextRequest) {
-  const realIp = req.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-  const forwarded = req.headers.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean);
-  return forwarded?.at(-1) ?? "unknown";
-}
 
 export async function POST(req: NextRequest) {
   const ip = clientIp(req);

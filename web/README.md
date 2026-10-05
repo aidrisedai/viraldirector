@@ -57,6 +57,7 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 | `ANTHROPIC_WORKSPACE_ID` | Only for unscoped keys | Needed when the key starts with `sk-ant-usr-`. Prefer a workspace-scoped key. |
 | `DIRECTOR_MODEL` | No | Defaults to `claude-opus-5-5`. |
 | `PLAN_RATE_LIMIT` | No | Plans per IP per 10 minutes (default 10). |
+| `CHAT_RATE_LIMIT` | No | Questions and feedback requests to the Director per IP per 10 minutes (default 40). |
 | `NEXT_PUBLIC_SITE_URL` | No | Canonical URL for share metadata. |
 
 ## How it works
@@ -70,6 +71,17 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 | Review | Plays the take back. Automatic checks measured in the browser: duration vs. target, audio level/clipping, whether speech was heard. Keep or retake. |
 | Export | Rough cut plays kept takes back to back; quality gate (hook ≤ 3s, length, clipping, required shots); downloads numbered takes and the script. |
 
+**Ask the Director** (header button, every step) answers questions about the video with the plan and current
+shot as context (`POST /api/director`):
+
+- **Words:** filmmaking terms (A-roll, chest-up, eye line, pattern interrupt…) are tappable everywhere they appear.
+  Definitions and "What is …?" questions come from `lib/glossary.ts` instantly, with no API call, and work without a key.
+- **Line feedback:** "Ask the Director about this line" judges an edited line against its beat and length and can
+  suggest a rewrite that applies with one click.
+- **Take feedback:** on Review, the Director sees four frames from the take (center-cropped to 9:16), the audio
+  measurements and, where the browser supports speech recognition, a transcript, then says keep or retake.
+  Chrome and Edge send the audio to their own speech service for this; Safari transcribes on-device; Firefox has none.
+
 The plan persists in `localStorage`. Takes stay in memory only, and the page warns before a refresh discards them.
 
 ### Code map
@@ -78,7 +90,10 @@ The plan persists in `localStorage`. Takes stay in memory only, and the page war
 - `lib/director.ts`: Claude call (server-only), prompt, schema, refusal fallback
 - `lib/plan.ts`: brief/plan schemas, sample plan, helpers
 - `lib/takes.ts`: take review, export gate, file naming, script export
-- `components/director/`: the six steps; `useRecorder.ts` is camera + MediaRecorder + audio metering
+- `app/api/director/route.ts`, `lib/directorChat.ts`, `lib/chat.ts`: Ask the Director (ask / line / take modes)
+- `lib/glossary.ts`: plain-language definitions used by tappable terms and instant answers
+- `components/director/`: the six steps; `useRecorder.ts` is camera + MediaRecorder + audio metering + transcript;
+  `DirectorPanel.tsx` + `useDirectorChat.ts` are the chat; `frames.ts` grabs frames for take feedback
 - `components/ds/`: EdAI design-system primitives (Button, Badge, Icon)
 
 ## Production notes and known limits

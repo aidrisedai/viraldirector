@@ -6,9 +6,18 @@ import { reviewTake, type Take } from "@/lib/takes";
 import { fixDuration } from "./useRecorder";
 import s from "./director.module.css";
 
-type Props = { shot: Shot; index: number; take: Take; takeNumber: number; onRetake: () => void; onKeep: () => void };
+type Props = {
+  shot: Shot;
+  index: number;
+  take: Take;
+  takeNumber: number;
+  onRetake: () => void;
+  onKeep: () => void;
+  onAskDirector: () => void;
+  askBusy: boolean;
+};
 
-export function ReviewStep({ shot, index, take, takeNumber, onRetake, onKeep }: Props) {
+export function ReviewStep({ shot, index, take, takeNumber, onRetake, onKeep, onAskDirector, askBusy }: Props) {
   const review = useMemo(() => reviewTake(take, shot), [take, shot]);
   const good = review.verdict === "accept";
 
@@ -51,6 +60,26 @@ export function ReviewStep({ shot, index, take, takeNumber, onRetake, onKeep }: 
               </div>
             ))}
             {take.source === "upload" && <span className={s.hint}>Audio checks run on takes recorded here, not on uploads.</span>}
+          </div>
+
+          {take.transcript && (
+            <div className={s.stack} style={{ gap: 6 }}>
+              <span className={s.small}>What I heard</span>
+              <span className={s.serifLine}>“{take.transcript}”</span>
+            </div>
+          )}
+
+          <div className={s.askCard}>
+            <div className={s.stack} style={{ gap: 4 }}>
+              <span style={{ fontSize: 15, fontWeight: 500 }}>Want a second opinion?</span>
+              <span className={s.hint}>
+                The Director looks at frames from this take{take.transcript ? ", what you said" : ""} and the audio checks, then
+                tells you what to fix.
+              </span>
+            </div>
+            <Button variant="outline" size="md" icon="message" onClick={onAskDirector} disabled={askBusy}>
+              Ask the Director
+            </Button>
           </div>
 
           <div className={s.actions}>

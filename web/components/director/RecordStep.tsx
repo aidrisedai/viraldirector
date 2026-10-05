@@ -3,6 +3,7 @@ import { Button } from "@/components/ds/Button";
 import { Icon } from "@/components/ds/Icon";
 import { SHOT_TYPE_LABEL, type Plan } from "@/lib/plan";
 import type { Take } from "@/lib/takes";
+import { Term } from "./Term";
 import { useRecorder } from "./useRecorder";
 import s from "./director.module.css";
 
@@ -81,7 +82,7 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
           <video ref={videoRef} className={s.cameraFeed} autoPlay muted playsInline />
           {phase !== "ready" && phase !== "recording" && phase !== "countdown" && (
             <div className={s.cameraLabel}>
-              {phase === "starting" ? "STARTING CAMERA…" : (
+              {phase === "starting" ? "STARTING CAMERA…" : phase === "saving" ? "SAVING TAKE…" : (
                 <div className={s.cameraError} role="alert">
                   <span>{error}</span>
                   <Button variant="outline" tone="dark" size="sm" onClick={retryCamera}>Try again</Button>
@@ -94,8 +95,8 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
           <div className={s.gridH} style={{ top: "33.3%" }} />
           <div className={s.gridH} style={{ top: "66.6%" }} />
           <div className={s.eyeLine} />
-          <span className={s.eyeLineLabel}>EYE LINE</span>
-          <div className={s.safeZone}>CAPTION SAFE ZONE</div>
+          <span className={s.eyeLineLabel}><Term word="Eye line" dark>EYE LINE</Term></span>
+          <div className={s.safeZone}><Term word="Caption safe zone" dark>CAPTION SAFE ZONE</Term></div>
           {phase === "countdown" && <div className={s.countdown} aria-live="assertive">{count}</div>}
           <div className={s.timer}>
             <span className={s.recDot} style={{ opacity: recording ? 1 : 0.35 }} />
@@ -121,7 +122,7 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
             type="button"
             className={s.stop}
             onClick={phase === "ready" ? start : stop}
-            disabled={phase === "starting" || phase === "error"}
+            disabled={phase === "starting" || phase === "saving" || phase === "error"}
             aria-label={phase === "ready" ? "Start recording" : phase === "countdown" ? "Cancel countdown" : "Stop recording"}
           >
             <span className={phase === "ready" ? s.recStart : s.recStop} />

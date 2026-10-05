@@ -6,11 +6,14 @@ import { applyHook, DEFAULT_BRIEF, type Brief, type Plan, type PlanResponse } fr
 import { clearProject, loadProject, saveProject } from "@/lib/storage";
 import type { Take } from "@/lib/takes";
 import { ConceptStep } from "./ConceptStep";
+import { DirectorProvider } from "./DirectorContext";
+import { DirectorPanel } from "./DirectorPanel";
 import { ExportStep } from "./ExportStep";
 import { PlanStep } from "./PlanStep";
 import { RecordStep } from "./RecordStep";
 import { ReviewStep } from "./ReviewStep";
 import { ShotsStep } from "./ShotsStep";
+import { useDirectorChat } from "./useDirectorChat";
 import s from "./director.module.css";
 
 const STEPS = ["Concept", "Plan", "Shots", "Record", "Review", "Export"] as const;
@@ -20,6 +23,8 @@ export function Director() {
   const [step, setStep] = useState<Step>(1);
   const [brief, setBrief] = useState<Brief>(DEFAULT_BRIEF);
   const [plan, setPlan] = useState<Plan | null>(null);
+  // The plan as the Director wrote it; line feedback compares the creator's edits against it.
+  const [basePlan, setBasePlan] = useState<Plan | null>(null);
   const [sample, setSample] = useState(false);
   const [hook, setHook] = useState(0);
   const [shot, setShot] = useState(0);
@@ -36,6 +41,7 @@ export function Director() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration from storage
       setBrief(saved.brief);
       setPlan(saved.plan);
+      setBasePlan(saved.plan);
       setSample(saved.sample);
       setHook(saved.hook);
       setShot(saved.shot);
@@ -62,6 +68,10 @@ export function Director() {
   );
   const latestTake = useMemo(() => takes.findLast((t) => t.shot === shot), [takes, shot]);
 
+  const chat = useDirectorChat({ brief, plan, basePlan, hook, step: STEPS[step - 1], shot });
+  const { ask, setOpen: setPanelOpen } = chat;
+  const directorActions = useMemo(() => ({ ask, open: () => setPanelOpen(true) }), [ask, setPanelOpen]);
+
   const direct = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -77,6 +87,7 @@ export function Director() {
       setTakes([]);
       setKept({});
       setPlan(applyHook(data.plan, 0));
+      setBasePlan(applyHook(data.plan, 0));
       setSample(data.sample);
       setHook(0);
       setShot(0);
@@ -91,6 +102,7 @@ export function Director() {
   const pickHook = (i: number) => {
     setHook(i);
     setPlan((p) => (p ? applyHook(p, i) : p));
+    setBasePlan((p) => (p ? applyHook(p, i) : p));
   };
 
   const editLine = (i: number, line: string) =>
@@ -123,6 +135,9 @@ export function Director() {
     setTakes([]);
     setKept({});
     setPlan(null);
+    setBasePlan(null);
+    chat.clear();
+    chat.setOpen(false);
     setSample(false);
     setHook(0);
     setShot(0);
@@ -134,7 +149,8 @@ export function Director() {
   const canVisit = (n: Step) => n === 1 || (plan !== null && (n !== 5 || latestTake !== undefined));
 
   return (
-    <div className={s.app}>
+    <DirectorProvider value={directorActions}>
+    <div className={`${s.app} ${chat.open ? s.appWithPanel : ""}`}>
       <header className={s.header}>
         <div className={s.brand}>
           <span className={s.wordmark}>ViralDirector</span>
@@ -164,7 +180,12 @@ export function Director() {
             );
           })}
         </nav>
-        {plan && <Button variant="ghost" size="sm" onClick={reset}>New video</Button>}
+        <div className={s.headerActions}>
+          <Button variant={chat.open ? "secondary" : "outline"} size="sm" icon="message" onClick={() => chat.setOpen(!chat.open)} aria-expanded={chat.open}>
+            Ask the Director
+          </Button>
+          {plan && <Button variant="ghost" size="sm" onClick={reset}>New video</Button>}
+        </div>
       </header>
 
       {step === 1 && (
@@ -188,6 +209,8 @@ export function Director() {
           onEditLine={editLine}
           onRecord={() => setStep(4)}
           onUpload={addTake}
+          onAskLine={chat.askLine}
+          askBusy={chat.busy}
         />
       )}
       {step === 4 && plan && <RecordStep plan={plan} shot={shot} onTake={addTake} onBack={() => setStep(3)} />}
@@ -199,9 +222,24 @@ export function Director() {
           takeNumber={takes.filter((t) => t.shot === shot).length}
           onRetake={() => setStep(4)}
           onKeep={() => keepTake(latestTake)}
+          onAskDirector={() => chat.askTake(latestTake, takes.filter((t) => t.shot === shot).length)}
+          askBusy={chat.busy}
         />
       )}
       {step === 6 && plan && <ExportStep plan={plan} brief={brief} hook={hook} kept={keptTakes} onGoToShot={(i) => { setShot(i); setStep(3); }} />}
+
+      <DirectorPanel
+        open={chat.open}
+        onClose={() => chat.setOpen(false)}
+        messages={chat.messages}
+        busy={chat.busy}
+        plan={plan}
+        shot={shot}
+        onAsk={chat.ask}
+        onApplyLine={editLine}
+        onClear={chat.clear}
+      />
     </div>
+    </DirectorProvider>
   );
 }

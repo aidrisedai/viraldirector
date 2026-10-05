@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ds/Button";
 import { Icon } from "@/components/ds/Icon";
+import { speechRecognition, type Recognition } from "@/lib/speech";
 import { AUDIENCES, CONCEPT_MAX, FORMATS, GOALS, LENGTHS, PLATFORMS, SAMPLE_CONCEPT, type Brief } from "@/lib/plan";
 import { Chips } from "./Chips";
 import s from "./director.module.css";
@@ -12,24 +13,6 @@ type Props = {
   loading: boolean;
   error: string;
 };
-
-// Minimal typing for the Web Speech API, which TypeScript's DOM lib doesn't ship everywhere.
-type Recognition = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start(): void;
-  stop(): void;
-  onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-};
-type RecognitionCtor = new () => Recognition;
-
-function speechRecognition(): RecognitionCtor | undefined {
-  const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-}
 
 const noSubscribe = () => () => {};
 

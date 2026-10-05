@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { startTranscript } from "@/lib/speech";
 import { CLIP_LEVEL, type Take } from "@/lib/takes";
 
 // H.264 MP4 first (Chrome, Edge, Safari): it carries a duration and opens in every editor.
@@ -15,7 +16,7 @@ const MIME_CANDIDATES = [
 
 const SPEECH_RMS = 0.02;
 
-export type Phase = "starting" | "ready" | "countdown" | "recording" | "error";
+export type Phase = "starting" | "ready" | "countdown" | "recording" | "saving" | "error";
 
 function pickMime() {
   if (typeof MediaRecorder === "undefined") return null;
@@ -144,12 +145,16 @@ export function useRecorder({ shot, seconds, onTake }: { shot: number; seconds: 
     };
 
     recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-    recorder.onstop = () => {
+    const transcript = startTranscript();
+
+    recorder.onstop = async () => {
       clearTimers();
       const secs = (performance.now() - started) / 1000;
       audio?.close().catch(() => {});
       const type = recorder.mimeType || mime || "video/webm";
       const blob = new Blob(chunks, { type });
+      setPhase("saving");
+      const text = transcript ? await transcript.stop() : null;
       setPhase("ready");
       setElapsed(0);
       onTakeRef.current({
@@ -162,6 +167,7 @@ export function useRecorder({ shot, seconds, onTake }: { shot: number; seconds: 
         peak: audio ? peak : null,
         clipped: audio && frames ? clippedFrames / frames : null,
         voiced: audio && frames ? voicedFrames / frames : null,
+        transcript: text,
         source: "camera",
       });
     };
@@ -199,7 +205,7 @@ export function takeFromFile(file: File, shot: number): Promise<Take> {
     const v = document.createElement("video");
     v.preload = "metadata";
     const done = (seconds: number) =>
-      resolve({ id: crypto.randomUUID(), shot, url, blob: file, mime: file.type || "video/mp4", seconds: Math.round(seconds * 10) / 10, peak: null, clipped: null, voiced: null, source: "upload" });
+      resolve({ id: crypto.randomUUID(), shot, url, blob: file, mime: file.type || "video/mp4", seconds: Math.round(seconds * 10) / 10, peak: null, clipped: null, voiced: null, transcript: null, source: "upload" });
     v.onloadedmetadata = () => {
       if (Number.isFinite(v.duration)) return done(v.duration);
       // Some WebM files report Infinity until seeked to the end.
