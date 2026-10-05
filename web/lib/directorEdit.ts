@@ -18,7 +18,7 @@ Rules:
 - Times are seconds from the start of the segment as trimmed (the word timings use the same clock). Stay inside each segment's length.
 - Only reference segments, shots and extra ids that exist in the request.
 - Voice: warm, confident, specific, builder-focused. Say build, launch, ship — not learn or classes. No emoji, no hashtags, no exclamation marks in callouts.
-- If brand is on, the end card says "Raising Muslim Teens as Builders and Founders" already; make endCta an action (for example "Follow for more builder stories").`;
+- If brand is on, the end card says "Raising Principled and Ambitious Teens as Builders and Founders" already; make endCta an action (for example "Follow for more builder stories").`;
 
 const str = { type: "string" } as const;
 const num = { type: "number" } as const;

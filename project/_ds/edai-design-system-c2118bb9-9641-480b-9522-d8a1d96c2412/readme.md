@@ -33,7 +33,7 @@ No source defined a component inventory (no product codebase/Figma), so this is 
 - **Faith is the foundation, not the aesthetic.** Values (ihsan, amanah, service) come through in substance; no decorative religious clichés. "Assalamu alaikum" only where appropriate to the recipient.
 - **Person:** "we/EdAI" to "you/your community". Direct address, short sentences.
 - **Casing:** Sentence case for headlines and buttons ("Register now", "Partner with us"). UPPERCASE only for tracked eyebrows and the "SUMMER SUMMIT" lockup. Brand name always **EdAI** (lowercase d).
-- **Exact tagline:** "Raising Muslim Teens as Builders and Founders" — never paraphrased.
+- **Exact tagline:** "Raising Principled and Ambitious Teens as Builders and Founders" — never paraphrased.
 - **Core line:** "Together, we can help young people move from consuming technology to creating value with it."
 - **Journey (always this order):** Discover a meaningful problem → understand a specific user → build → test → present.
 - **Honesty rules:** never invent attendance, partners, outcomes or stats; goals are labelled goals ("100–200 student goal"). One specific next action with an owner and a date ends every proposal ("Reply 'Yes, let's partner'").

@@ -112,7 +112,7 @@ Rendering is real time (a 45s video takes about 45s) and needs the tab to stay v
   Without the Director, a built-in edit lays B-roll over the voice and places added items on the talking parts.
 - **EdAI branding** (on by default): the official wordmark (`public/brand/`, from the `edai-logo` brand skill) in a
   protected panel top-left over the opening, and an end card with the white wordmark, the call to action and the
-  tagline "Raising Muslim Teens as Builders and Founders" bottom-centre. Per the brand rules there is no watermark
+  tagline "Raising Principled and Ambitious Teens as Builders and Founders" bottom-centre. Per the brand rules there is no watermark
   and no standalone brandmark.
 
 The plan persists in `localStorage`. Takes stay in memory only, and the page warns before a refresh discards them.

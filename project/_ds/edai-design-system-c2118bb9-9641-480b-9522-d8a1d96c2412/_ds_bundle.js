@@ -222,7 +222,7 @@ function Tagline({
       color: color || "currentColor",
       ...style
     }
-  }, "Raising Muslim Teens as Builders and Founders");
+  }, "Raising Principled and Ambitious Teens as Builders and Founders");
 }
 Object.assign(__ds_scope, { Tagline });
 })(); } catch (e) { __ds_ns.__errors.push({ path: "components/brand/Tagline.jsx", error: String((e && e.message) || e) }); }

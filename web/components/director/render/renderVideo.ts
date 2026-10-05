@@ -34,7 +34,9 @@ const OUTPUT_TYPES = [
 export const outputType = () =>
   typeof MediaRecorder === "undefined" ? null : (OUTPUT_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ?? null);
 
-export const TAGLINE = "Raising Muslim Teens as Builders and Founders";
+export const TAGLINE = "Raising Principled and Ambitious Teens as Builders and Founders";
+/** The tagline broken at its natural pause, for formats too narrow for one line. */
+const TAGLINE_LINES = ["Raising Principled and Ambitious Teens", "as Builders and Founders"];
 const BRAND = "#1FA67A";
 const CREAM = "#F4EEE3";
 const HOOK_FOR = 2.6;
@@ -81,9 +83,16 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   return img;
 }
 
-function fontFamily() {
-  const f = getComputedStyle(document.documentElement).getPropertyValue("--font-outfit").trim();
-  return f ? `${f}, Outfit, system-ui, sans-serif` : "Outfit, system-ui, sans-serif";
+// Brand type: Libre Baskerville for large display text (hook title, big numbers);
+// Outfit for everything smaller, and for captions, which must read at a glance.
+function fontFamilies() {
+  const css = getComputedStyle(document.documentElement);
+  const outfit = css.getPropertyValue("--font-outfit").trim();
+  const serif = css.getPropertyValue("--font-baskerville").trim();
+  return {
+    sans: outfit ? `${outfit}, Outfit, system-ui, sans-serif` : "Outfit, system-ui, sans-serif",
+    serif: serif ? `${serif}, "Libre Baskerville", Georgia, serif` : `"Libre Baskerville", Georgia, serif`,
+  };
 }
 
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
@@ -136,8 +145,13 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
-  const font = fontFamily();
-  await document.fonts.load(`800 80px ${font}`).catch(() => {});
+  const { sans: font, serif } = fontFamilies();
+  await Promise.all([
+    document.fonts.load(`700 80px ${font}`),
+    document.fonts.load(`600 80px ${font}`),
+    document.fonts.load(`500 80px ${font}`),
+    document.fonts.load(`700 80px ${serif}`),
+  ]).catch(() => {});
 
   // ---------- media ----------
   const videos = await Promise.all(seq.map((s) => prepareVideo(s.take.url, s.from)));
@@ -253,7 +267,7 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
     const stat = c.style === "stat";
     const size = Math.round(W * (stat ? 0.085 : 0.045));
     ctx.save();
-    ctx.font = `800 ${size}px ${font}`;
+    ctx.font = stat ? `700 ${size}px ${serif}` : `700 ${size}px ${font}`;
     const text = stat ? c.text : c.text.toUpperCase();
     const tw = Math.min(ctx.measureText(text).width, W * 0.8);
     const padX = size * (stat ? 0.55 : 0.6), padY = size * (stat ? 0.35 : 0.45);
@@ -276,14 +290,14 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
     const active = chunks[i].find((c) => local < c[c.length - 1].end);
     if (!active || local < active[0].start - 0.05) return;
     let size = Math.round(W * (o.format === "9:16" ? 0.074 : 0.062));
-    ctx.font = `800 ${size}px ${font}`;
+    ctx.font = `700 ${size}px ${font}`;
     const words = active.map((w) => w.word.toUpperCase().replace(/[“”"]/g, ""));
     const gap = size * 0.28;
     let widths = words.map((w) => ctx.measureText(w).width);
     let lineW = widths.reduce((a, b) => a + b, 0) + gap * (words.length - 1);
     if (lineW > W * 0.86) {
       size = Math.floor((size * (W * 0.86)) / lineW);
-      ctx.font = `800 ${size}px ${font}`;
+      ctx.font = `700 ${size}px ${font}`;
       widths = words.map((w) => ctx.measureText(w).width);
       lineW = widths.reduce((a, b) => a + b, 0) + gap * (words.length - 1);
     }
@@ -369,8 +383,8 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
     if (o.hookTitle && elapsed < HOOK_FOR) {
       const inP = ease(elapsed / 0.35);
       const outP = elapsed > HOOK_FOR - 0.25 ? 1 - (elapsed - (HOOK_FOR - 0.25)) / 0.25 : 1;
-      const size = Math.round(W * 0.062);
-      ctx.font = `800 ${size}px ${font}`;
+      const size = Math.round(W * 0.06);
+      ctx.font = `700 ${size}px ${serif}`;
       const lines = wrap(ctx, o.hookTitle, W * 0.78);
       const lh = size * 1.18;
       const boxW = Math.min(W * 0.88, Math.max(...lines.map((l) => ctx.measureText(l).width)) + size * 1.4);
@@ -420,19 +434,23 @@ export async function renderVideo(o: RenderOptions): Promise<RenderResult> {
     ctx.fillText(o.edit.endCta, W / 2, H * 0.4 + lh / 2 + ctaSize * 0.6 + 24 * (1 - ease((t - 0.35) / 0.4)), W * 0.86);
     ctx.restore();
 
-    // Tagline in the footer zone, above the platform's on-screen buttons.
+    // Tagline in the footer zone, above the platform's on-screen buttons. Set on balanced lines
+    // rather than squeezed, so the type is never distorted.
     const tagSize = Math.round(W * 0.034);
-    const tagY = H * (o.format === "9:16" ? 0.8 : 0.86);
+    const tagLh = tagSize * 1.45;
     ctx.save();
     ctx.globalAlpha = ease((t - 0.7) / 0.4);
+    ctx.font = `500 ${tagSize}px ${font}`;
+    if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "1px";
+    const tagLines = ctx.measureText(TAGLINE).width > W * 0.84 ? TAGLINE_LINES : [TAGLINE];
+    const tagBottom = H * (o.format === "9:16" ? 0.82 : 0.88);
+    const tagY = tagBottom - (tagLines.length - 1) * tagLh;
     ctx.fillStyle = BRAND;
     ctx.fillRect(W / 2 - 28, tagY - tagSize * 1.4, 56, 4);
-    ctx.font = `500 ${tagSize}px ${font}`;
     ctx.fillStyle = CREAM;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "1px";
-    ctx.fillText(TAGLINE, W / 2, tagY, W * 0.9);
+    tagLines.forEach((line, k) => ctx.fillText(line, W / 2, tagY + k * tagLh));
     ctx.restore();
   };
 
