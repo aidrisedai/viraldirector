@@ -39,7 +39,8 @@ docker run -p 3000:3000 --env-file .env.local viraldirector
 1. Railway → **New Project → Deploy from GitHub repo** → `aidrisedai/viraldirector`.
 2. Service **Settings → Source → Root Directory**: `/web`. Set **Config file path** to `/web/railway.json`
    if Railway doesn't pick it up.
-3. **Variables:** add `ANTHROPIC_API_KEY` (and `ANTHROPIC_WORKSPACE_ID` if the key starts with `sk-ant-usr-`).
+3. **Variables:** add `ANTHROPIC_API_KEY` (and `ANTHROPIC_WORKSPACE_ID` if the key starts with `sk-ant-usr-`), and
+   `OPENAI_API_KEY` for server-side captions.
    Railway injects `PORT`; don't set it.
 4. **Settings → Networking → Generate Domain** (HTTPS, which the camera needs). Optionally add a custom domain and
    set `NEXT_PUBLIC_SITE_URL` to it.
@@ -47,7 +48,7 @@ docker run -p 3000:3000 --env-file .env.local viraldirector
 
 Every push to `main` redeploys; a deploy goes live only after `/api/health` responds.
 
-Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}`.
+Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample","transcription":"server"|"device"}`.
 
 ## Environment
 
@@ -55,10 +56,13 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | For real plans | Server-side key for the Director. Never expose it as `NEXT_PUBLIC_*`. |
 | `ANTHROPIC_WORKSPACE_ID` | Only for unscoped keys | Needed when the key starts with `sk-ant-usr-`. Prefer a workspace-scoped key. |
+| `OPENAI_API_KEY` | Recommended | Server-side speech-to-text (exact captions with no model download for creators). |
+| `OPENAI_TRANSCRIBE_MODEL` | No | Defaults to `whisper-1` (needed for word timestamps). |
+| `TRANSCRIBE_RATE_LIMIT` | No | Transcriptions per IP per 10 minutes (default 60). |
+| `WRITER_RATE_LIMIT` | No | Writer questions, drafts and revisions per IP per 10 minutes (default 20). |
 | `DIRECTOR_MODEL` | No | Defaults to `claude-opus-5-5`. |
 | `PLAN_RATE_LIMIT` | No | Plans per IP per 10 minutes (default 10). |
 | `EDIT_RATE_LIMIT` | No | Director edit plans per IP per 10 minutes (default 10). |
-| `WRITER_RATE_LIMIT` | No | Writer questions, drafts and revisions per IP per 10 minutes (default 20). |
 | `CHAT_RATE_LIMIT` | No | Questions and feedback requests to the Director per IP per 10 minutes (default 40). |
 | `NEXT_PUBLIC_SITE_URL` | No | Canonical URL for share metadata. |
 
@@ -71,7 +75,7 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 | Shots | Call sheet grouped by location, required/optional, framing/lighting/delivery. Lines are editable. Upload a clip instead of recording. |
 | Record | Live webcam with thirds grid, eye line, caption safe zone; 3-second countdown; auto-stop at target + 0.5s; teleprompter advances with the take; space starts/stops. |
 | Review | Plays the take back. Automatic checks measured in the browser: duration vs. target, audio level/clipping, whether speech was heard. Keep or retake. |
-| Export | **Create my video** renders the finished, postable video in the browser (below). Quality gate (hook ≤ 3s, length, clipping, required shots), a Director-written post caption, and raw takes/script downloads. |
+| Export | **The editor**: a live preview of the finished video and a timeline to arrange it by hand (below). **Export my video** makes the file. Quality gate (hook ≤ 3s, length, clipping, required shots), a Director-written post caption, and raw takes/script downloads. |
 
 **Tell the full story** (`components/director/StoryWriter.tsx`, `POST /api/writer`, `lib/writer.ts`, `lib/story.ts`):
 the creator explains the scenario in their own words (up to 4,000 characters, typed or dictated) and picks a writer —
@@ -93,7 +97,19 @@ shot as context (`POST /api/director`):
   measurements and, where the browser supports speech recognition, a transcript, then says keep or retake.
   Chrome and Edge send the audio to their own speech service for this; Safari transcribes on-device; Firefox has none.
 
-**Create my video** (`components/director/render/`, logic in `lib/edit.ts`) turns the kept takes into one video,
+**The editor** (`components/director/editor/Editor.tsx`, logic in `lib/timeline.ts`) is where the video is finished by
+hand, no prompts needed:
+
+- A live preview of the finished video — play, pause, scrub, ←/→ to step, Space to play. It is drawn by the same engine
+  that exports the file (`render/engine.ts` + `render/compositor.ts`), so the preview *is* the final video.
+- A timeline with **Clips** (tap one to fix its captions or remove it; removed clips can be put back), **Overlays**
+  (pictures and clips over your voice — drag them from the media bin or straight from your computer onto the row, tap
+  "+ At playhead", drag to move, drag the right edge to lengthen, switch Full screen / Card), **Text** (add text at the
+  playhead, edit it, make it a big counting number) and **Music** (the volume slider changes the level live while it plays).
+- Undo/redo (⌘/Ctrl+Z), Delete to remove the selected piece. The look controls (caption style, motion, title, music)
+  update the preview immediately. Hand edits are saved as "Your edit"; the Director can still revise them.
+
+**Export my video** (`components/director/render/`, logic in `lib/edit.ts`) turns the edit into one video file,
 entirely in the browser — nothing is uploaded:
 
 - Takes in script order; dead air trimmed from each clip's start and end (speech detection on the decoded audio).
@@ -119,10 +135,12 @@ Rendering is real time (a 45s video takes about 45s) and needs the tab to stay v
 **Finishing tools on the Export step:**
 
 - **Captions** (`export/CaptionsCard.tsx`): captions follow what was actually said, not the script — the browser's
-  transcript where available, editable per clip, with the script shown when they differ. **Get exact captions** runs
-  Whisper (`Xenova/whisper-base.en`, transformers.js) on the device for word-level timing; the model (about 80–100 MB)
-  downloads from Hugging Face on first use and is cached. ONNX Runtime's WebAssembly is served from `/ort/`
-  (copied from `node_modules` at build). Footage never leaves the device.
+  transcript where available, editable per clip, with the script shown when they differ. **Exact captions** (word-level
+  timing): with `OPENAI_API_KEY` set they run automatically on the server (`POST /api/transcribe`, OpenAI `whisper-1` —
+  the hosted model that returns word timestamps; only a 16 kHz mono WAV of each clip's audio is sent, never the video;
+  the transcript's punctuation is aligned onto the word timings in `lib/transcript.ts`). Without it they run on the
+  device with Whisper (`Xenova/whisper-base.en`, transformers.js): a one-time 80–100 MB model download, cached; ONNX
+  Runtime's WebAssembly is served from `/ort/` (copied from `node_modules` at build).
 - **Extra content + the Director's edit** (`export/ExtrasCard.tsx`, `POST /api/edit`, `lib/editPlan.ts`): add up to 6
   pictures or clips with a note each, plus free-form notes. The Director (Claude, with thumbnails) returns an edit
   plan — cutaways over the voice (added clips or planned B-roll), picture-in-picture cards, stat/label callouts,

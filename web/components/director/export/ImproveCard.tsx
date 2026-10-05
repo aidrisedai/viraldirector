@@ -46,9 +46,10 @@ export function ImproveCard({ onImprove, busy, revisions }: Props) {
   return (
     <section className={`${s.createCard} ${s.improveCard}`} aria-label="Improve this video">
       <div className={s.stack} style={{ gap: 4 }}>
-        <span className={s.createTitle}>Improve this video</span>
+        <span className={s.createTitle}>Ask the Director to change it</span>
         <span className={s.hint}>
-          Say what you’d change — the Director re-edits and makes the video again. Times help: “at 0:12 the text covers my face”.
+          Rather say it than drag it? Describe the change — the Director re-edits and the preview updates. Times help: “at 0:12
+          the text covers my face”.
         </span>
       </div>
       <textarea
@@ -74,7 +75,7 @@ export function ImproveCard({ onImprove, busy, revisions }: Props) {
       {message && <p className={s.hint} role="status">{message}</p>}
       <div className={s.actions}>
         <Button icon="sparkles" onClick={submit} disabled={!feedback.trim() || busy || working}>
-          {working ? (busy ? "Making the new version…" : "The Director is re-editing…") : "Re-edit my video"}
+          {working ? "The Director is re-editing…" : "Re-edit my video"}
         </Button>
       </div>
       {revisions.length > 0 && (

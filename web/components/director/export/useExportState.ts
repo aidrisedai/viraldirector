@@ -10,7 +10,8 @@ export type PlanState = {
   plan: EditPlan;
   /** Which kept takes the plan was made for; a different set means the plan is stale. */
   signature: string;
-  source: "director" | "builtin";
+  /** manual: the creator's own hand edits in the editor. */
+  source: "director" | "builtin" | "manual";
 };
 
 export type Revision = { feedback: string; summary: string };

@@ -1,6 +1,6 @@
 import {
-  ArrowRight, Check, ChevronRight, Download, MessageCircle, Mic, Pencil, Play, RotateCcw, ScanFace, Share2,
-  Sparkles, Sun, Upload, Video, X, Zap, type LucideIcon,
+  ArrowRight, Check, ChevronRight, Download, ImagePlus, MessageCircle, Mic, Pause, Pencil, Play, Plus, Redo2, RotateCcw,
+  ScanFace, Share2, Sparkles, Sun, Trash2, Type, Undo2, Upload, Video, Volume2, X, Zap, type LucideIcon,
 } from "lucide-react";
 import type { CSSProperties } from "react";
 
@@ -10,17 +10,25 @@ const ICONS = {
   check: Check,
   "chevron-right": ChevronRight,
   download: Download,
+  "image-plus": ImagePlus,
   message: MessageCircle,
   mic: Mic,
+  pause: Pause,
   pencil: Pencil,
   play: Play,
+  plus: Plus,
+  redo: Redo2,
   "rotate-ccw": RotateCcw,
   "scan-face": ScanFace,
   share: Share2,
   sparkles: Sparkles,
   sun: Sun,
+  trash: Trash2,
+  type: Type,
+  undo: Undo2,
   upload: Upload,
   video: Video,
+  volume: Volume2,
   x: X,
   zap: Zap,
 } satisfies Record<string, LucideIcon>;

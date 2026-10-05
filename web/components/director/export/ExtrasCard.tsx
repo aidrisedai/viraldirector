@@ -143,7 +143,7 @@ export function ExtrasCard({ state, onPlan, planStale }: Props) {
         <div className={s.planSummary}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Badge tone={planStale ? "warning" : "accent"} dot={!planStale}>
-              {planStale ? "Out of date — your takes changed" : editPlan.source === "director" ? "Director’s edit" : "Built-in edit"}
+              {planStale ? "Out of date — your takes changed" : editPlan.source === "director" ? "Director’s edit" : editPlan.source === "manual" ? "Your edit" : "Built-in edit"}
             </Badge>
             {counts && <span className={s.hint}>{counts}</span>}
           </div>
@@ -154,7 +154,7 @@ export function ExtrasCard({ state, onPlan, planStale }: Props) {
 
       <div className={s.actions}>
         <Button size="md" icon="sparkles" onClick={plan} disabled={busy}>
-          {busy ? "The Director is editing…" : p ? "Ask the Director to edit again" : "Let the Director edit"}
+          {busy ? "The Director is editing…" : p ? "Ask the Director to edit from scratch" : "Let the Director edit"}
         </Button>
       </div>
     </div>

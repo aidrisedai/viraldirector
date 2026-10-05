@@ -2,8 +2,11 @@
 
 import { wordsFromChunks, type TimedWord } from "@/lib/edit";
 import type { Take } from "@/lib/takes";
+import { encodeWav, TRANSCRIBE_MAX_SECONDS } from "@/lib/transcript";
 
-export type TranscribeProgress = { phase: "download"; fraction: number } | { phase: "transcribe"; done: number; total: number };
+export type TranscribeProgress =
+  | { phase: "download"; fraction: number }
+  | { phase: "transcribe"; done: number; total: number; where: "server" | "device" };
 export type TakeTranscript = { text: string; words: TimedWord[] };
 
 let worker: Worker | null = null;
@@ -35,7 +38,7 @@ export async function transcribeTakes(takes: Take[], onProgress: (p: TranscribeP
       const onMessage = (e: MessageEvent) => {
         const m = e.data;
         if (m.type === "download") onProgress({ phase: "download", fraction: Math.min(1, m.progress / 100) });
-        else if (m.type === "ready") onProgress({ phase: "transcribe", done: i, total: takes.length });
+        else if (m.type === "ready") onProgress({ phase: "transcribe", done: i, total: takes.length, where: "device" });
         else if (m.id !== take.id) return;
         else if (m.type === "result") { w.removeEventListener("message", onMessage); resolve({ text: m.text, words: wordsFromChunks(m.chunks) }); }
         else if (m.type === "error") { w.removeEventListener("message", onMessage); reject(new Error(m.message)); }
@@ -44,7 +47,69 @@ export async function transcribeTakes(takes: Take[], onProgress: (p: TranscribeP
       w.postMessage({ id: take.id, audio }, [audio.buffer]);
     });
     results.set(take.id, result);
-    onProgress({ phase: "transcribe", done: i + 1, total: takes.length });
+    onProgress({ phase: "transcribe", done: i + 1, total: takes.length, where: "device" });
   }
   return results;
+}
+
+/** Thrown when the server has no transcription set up, so the caller can fall back to the device. */
+class NoServer extends Error {}
+
+async function transcribeOnServer(take: Take, prompt: string): Promise<TakeTranscript> {
+  const audio = await audio16k(take);
+  if (audio.length / 16000 > TRANSCRIBE_MAX_SECONDS) throw new Error("That clip is too long to transcribe.");
+  const form = new FormData();
+  form.append("audio", new Blob([encodeWav(audio, 16000)], { type: "audio/wav" }), "clip.wav");
+  form.append("prompt", prompt);
+  const res = await fetch("/api/transcribe", { method: "POST", body: form });
+  const data = (await res.json().catch(() => ({ error: "No response." }))) as TakeTranscript | { error: string };
+  if (res.status === 503 && "error" in data && /isn’t set up/.test(data.error)) throw new NoServer();
+  if ("error" in data) throw new Error(data.error);
+  return data;
+}
+
+let serverAvailable: boolean | null = null;
+
+/** Whether this deployment transcribes on the server (no model download for the creator). */
+export async function serverTranscription(): Promise<boolean> {
+  if (serverAvailable !== null) return serverAvailable;
+  try {
+    const health = await (await fetch("/api/health", { cache: "no-store" })).json();
+    serverAvailable = health.transcription === "server";
+  } catch {
+    serverAvailable = false;
+  }
+  return serverAvailable;
+}
+
+/**
+ * Exact captions with word timings: on the server when it's set up (fast, nothing to download),
+ * otherwise on this device. `prompts` (script lines by take id) help recognition with names.
+ */
+export async function transcribe(
+  takes: Take[],
+  prompts: Record<string, string>,
+  onProgress: (p: TranscribeProgress) => void,
+): Promise<Map<string, TakeTranscript>> {
+  if (await serverTranscription()) {
+    try {
+      const results = new Map<string, TakeTranscript>();
+      onProgress({ phase: "transcribe", done: 0, total: takes.length, where: "server" });
+      let done = 0;
+      // A few at a time keeps it quick without flooding the rate limit.
+      for (let i = 0; i < takes.length; i += 3) {
+        await Promise.all(
+          takes.slice(i, i + 3).map(async (t) => {
+            results.set(t.id, await transcribeOnServer(t, prompts[t.id] ?? ""));
+            onProgress({ phase: "transcribe", done: ++done, total: takes.length, where: "server" });
+          }),
+        );
+      }
+      return results;
+    } catch (e) {
+      if (!(e instanceof NoServer)) throw e;
+      serverAvailable = false;
+    }
+  }
+  return transcribeTakes(takes, onProgress);
 }

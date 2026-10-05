@@ -384,3 +384,13 @@ button.setting { cursor: pointer; }
 .revisionList { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--vd-text-body); }
 .revisionList li { display: flex; flex-direction: column; gap: 2px; }
 .revisionAsk { color: var(--vd-text-muted); font-style: italic; }
+
+/* ---------- Export step with the editor ---------- */
+.exportWrap { width: 100%; max-width: 1240px; display: flex; flex-direction: column; gap: 28px; }
+.exportWrap .mid { max-width: none; }
+.exportHead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 32px; flex-wrap: wrap; }
+.exportHead .checks { flex: 1; min-width: min(100%, 360px); max-width: 560px; }
+.exportCanvas { position: absolute; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+.exportResult { width: 100%; max-width: 280px; border-radius: var(--radius-card); background: #000; }
+.scrubLight { height: 6px; border-radius: 3px; background: var(--vd-hairline); overflow: hidden; }
+.scrubLight > div { height: 100%; background: var(--brand-accent); transition: width .2s linear; }

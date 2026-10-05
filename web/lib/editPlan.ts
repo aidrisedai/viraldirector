@@ -105,21 +105,30 @@ const segLength = (s: Segment) => s.to - s.from;
 const MIN_LEN = 0.8 - 1e-6;
 const NON_SPEECH_COVER = new Set(["b-roll", "insert", "screen"]);
 
-/** Clamps a plan (the Director's or the built-in one) to what the footage can actually support. */
-export function normalizePlan(plan: EditPlan, timeline: Segment[], extras: Pick<Extra, "id" | "kind" | "seconds">[]): EditPlan {
+/**
+ * Clamps a plan (the Director's, the built-in one, or the creator's own) to what the footage can actually
+ * support. `strict` (for generated plans) also keeps cutaways and callouts from overlapping; the creator's
+ * hand edits may overlap — the later one draws on top.
+ */
+export function normalizePlan(
+  plan: EditPlan,
+  timeline: Segment[],
+  extras: Pick<Extra, "id" | "kind" | "seconds">[],
+  { strict = true }: { strict?: boolean } = {},
+): EditPlan {
   const extraById = new Map(extras.map((e) => [e.id, e]));
   const usedShots = new Set<number>();
   const busy = new Map<number, [number, number][]>(); // segment → covered windows
 
   const fits = (segment: number, a: number, b: number) =>
-    !(busy.get(segment) ?? []).some(([x, y]) => a < y && b > x);
+    !strict || !(busy.get(segment) ?? []).some(([x, y]) => a < y && b > x);
   const take = (segment: number, a: number, b: number) => busy.set(segment, [...(busy.get(segment) ?? []), [a, b]]);
 
   const cutaways: Cutaway[] = [];
   for (const c of [...plan.cutaways].sort((x, y) => x.segment - y.segment || x.at - y.at)) {
     const seg = timeline[c.segment];
     if (!seg) continue;
-    let maxLen = 6;
+    let maxLen = strict ? 6 : 20;
     if (c.source.startsWith("extra:")) {
       const extra = extraById.get(c.source.slice(6));
       if (!extra) continue;
@@ -127,7 +136,7 @@ export function normalizePlan(plan: EditPlan, timeline: Segment[], extras: Pick<
     } else if (c.source.startsWith("shot:")) {
       const shot = Number(c.source.slice(5));
       const src = timeline.find((s) => s.shot === shot);
-      if (!src || src === seg || src.speech || usedShots.has(shot) || !seg.speech) continue;
+      if (!src || src === seg || src.speech || (strict && usedShots.has(shot)) || !seg.speech) continue;
       maxLen = Math.min(maxLen, segLength(src));
     } else continue;
     const len = segLength(seg);
@@ -147,9 +156,9 @@ export function normalizePlan(plan: EditPlan, timeline: Segment[], extras: Pick<
     if (!seg || !text) continue;
     const len = segLength(seg);
     const at = Math.min(Math.max(0, c.at), Math.max(0, len - 1));
-    const seconds = Math.min(Math.max(1, c.seconds), 4, len - at);
+    const seconds = Math.min(Math.max(1, c.seconds), strict ? 4 : 12, len - at);
     const windows = perSegment.get(c.segment) ?? [];
-    if (seconds < MIN_LEN || windows.length >= 2 || windows.some(([x, y]) => at < y && at + seconds > x)) continue;
+    if (seconds < MIN_LEN || (strict && (windows.length >= 2 || windows.some(([x, y]) => at < y && at + seconds > x)))) continue;
     perSegment.set(c.segment, [...windows, [at, at + seconds]]);
     callouts.push({ ...c, text, at: ms(at), seconds: ms(seconds) });
   }

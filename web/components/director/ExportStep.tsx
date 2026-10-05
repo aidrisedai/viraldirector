@@ -1,26 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ds/Badge";
 import { Button } from "@/components/ds/Button";
 import { Icon } from "@/components/ds/Icon";
 import type { ChatRequest, ChatResponse } from "@/lib/chat";
 import { buildTimeline, FORMATS, type FormatKey, type Segment, type SpeechAnalysis } from "@/lib/edit";
 import {
-  composeEdit, fallbackPlan, normalizePlan, timelineForDirector, type EditPlan, type EditRequest, type EditResponse, type Style,
+  composeEdit, EXTRAS_MAX, fallbackPlan, normalizePlan, timelineForDirector,
+  type EditPlan, type EditRequest, type EditResponse, type Extra, type Style,
 } from "@/lib/editPlan";
 import { reviseLocally } from "@/lib/revise";
 import { plannedSeconds, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/plan";
 import { exportChecks, scriptText, slug, takeFileName, type Take } from "@/lib/takes";
 import { Chips } from "./Chips";
+import { Editor } from "./editor/Editor";
 import { CaptionsCard } from "./export/CaptionsCard";
 import { ExtrasCard } from "./export/ExtrasCard";
 import { ImproveCard } from "./export/ImproveCard";
 import { LookControls } from "./export/LookControls";
 import type { ExportState } from "./export/useExportState";
-import { extraThumb } from "./render/media";
+import { extraFromFile, extraThumb } from "./render/media";
 import { analyzeTake } from "./render/analyze";
 import { generatedTrack, type MusicTrack } from "./render/musicTrack";
 import { END_CARD_SECONDS, outputType, renderVideo } from "./render/renderVideo";
-import { fixDuration } from "./useRecorder";
 import s from "./director.module.css";
 
 type Props = {
@@ -54,12 +55,9 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
   const checks = exportChecks(plan, brief, kept);
   const ready = checks.every((c) => c.ok);
   const cut = useMemo(() => kept.flatMap((t, i) => (t ? [{ take: t, shot: plan.shots[i] }] : [])), [kept, plan]);
-  const [clip, setClip] = useState(0);
-  const current = cut[Math.min(clip, cut.length - 1)];
 
   const [format, setFormat] = useState<FormatKey>(brief.platform === "LinkedIn" ? "4:5" : "9:16");
   const [render, setRender] = useState<Render>({ state: "idle" });
-  const [madeOnce, setMadeOnce] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const mime = useMemo(() => (typeof window === "undefined" ? null : outputType()), []);
@@ -94,6 +92,44 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
   };
 
   const musicKind = finish.music === "No music" ? "none" : finish.music === "My music" ? "custom" : "generated";
+
+  // The editor's timeline: rebuilt when takes, exact captions or caption edits change.
+  const [timeline, setTimeline] = useState<Segment[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    currentTimeline().then((t) => live && setTimeline(t));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- currentTimeline reads exactly these
+  }, [signature, finish.exact, finish.captionEdits, plan]);
+
+  // What the editor shows: the current edit (Director's, built-in, or the creator's own).
+  const editorPlan = useMemo(() => {
+    if (!timeline) return null;
+    if (finish.editPlan && !planStale) return finish.editPlan.plan;
+    return normalizePlan(fallbackPlan(timeline, finish.extras), timeline, finish.extras);
+  }, [timeline, finish.editPlan, planStale, finish.extras]);
+
+  const { setEditPlan, setExtras, setCaptionEdits } = finish;
+  const onHandEdit = useCallback((p: EditPlan) => setEditPlan({ plan: p, signature, source: "manual" }), [setEditPlan, signature]);
+
+  /** Files dropped or picked in the editor become extra content (and are placed by the editor). */
+  const addFiles = async (files: File[]) => {
+    // Freeze the current edit so the built-in edit doesn't also place the new items.
+    if (editorPlan && (!finish.editPlan || planStale)) onHandEdit(editorPlan);
+    const room = EXTRAS_MAX - finish.extras.length;
+    if (room <= 0) throw new Error(`You can add up to ${EXTRAS_MAX} items.`);
+    const added: Extra[] = [];
+    for (const file of files.slice(0, room)) {
+      const limit = file.type.startsWith("video/") ? 300 * 1024 * 1024 : 25 * 1024 * 1024;
+      if (file.size > limit) throw new Error(`${file.name} is too large (max ${Math.round(limit / 1024 / 1024)} MB).`);
+      added.push(await extraFromFile(file));
+    }
+    setExtras((all) => [...all, ...added]);
+    return added;
+  };
+  const onCaption = useCallback((takeId: string, text: string) => setCaptionEdits((prev) => ({ ...prev, [takeId]: text })), [setCaptionEdits]);
 
   /** Sends the timeline (and, for a revision, the current edit and feedback) to the Director. */
   const requestEdit = async (timeline: Segment[], feedback: string, current: EditPlan | null): Promise<{ data: EditResponse; status: number }> => {
@@ -154,7 +190,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
     const timeline = await currentTimeline();
     const current = finish.editPlan && !planStale ? finish.editPlan.plan : normalizePlan(fallbackPlan(timeline, finish.extras), timeline, finish.extras);
     const { data, status } = await requestEdit(timeline, feedback, current);
-    let next: EditPlan, style: Style, summary: string, source: "director" | "builtin";
+    let next: EditPlan, style: Style, summary: string, source: "director" | "builtin" | "manual";
     let note = "";
     if ("error" in data) {
       // Without the Director, the built-in rules still handle the look and the music.
@@ -167,7 +203,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
       style = local.style;
       const list = local.changes.join(", ");
       summary = `${list.charAt(0).toUpperCase()}${list.slice(1)}.`;
-      source = finish.editPlan?.source === "director" && !planStale ? "director" : "builtin";
+      source = finish.editPlan && !planStale ? finish.editPlan.source : "builtin";
       if (status !== 503) note = `${data.error} Made the changes the built-in editor understands.`;
     } else {
       next = normalizePlan(data.plan, timeline, finish.extras);
@@ -180,7 +216,6 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
     finish.setStyle(style);
     finish.setCaptionEdits(edits);
     finish.setRevisions((r) => [...r, { feedback, summary }]);
-    await create({ plan: next, style, edits });
     return note;
   };
 
@@ -196,7 +231,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
       const timeline = await currentTimeline(over.edits);
       // The Director's edit if it matches these takes; otherwise the built-in one.
       const chosen = over.plan ?? (finish.editPlan && !planStale ? finish.editPlan.plan : fallbackPlan(timeline, finish.extras));
-      const edit = composeEdit(timeline, normalizePlan(chosen, timeline, finish.extras));
+      const edit = composeEdit(timeline, normalizePlan(chosen, timeline, finish.extras, { strict: false }));
       const seconds = edit.sequence.reduce((t, x) => t + (x.to - x.from), 0) + (finish.brand ? END_CARD_SECONDS : 0);
       let track: MusicTrack | null = null;
       if (finish.music === "My music") {
@@ -217,7 +252,6 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
         signal: ctrl.signal,
       });
       setRender({ state: "done", url: URL.createObjectURL(result.blob), ...result, format });
-      setMadeOnce(true);
     } catch (e) {
       setRender({ state: "error", message: e instanceof Error ? e.message : "Something went wrong while creating your video." });
     }
@@ -282,52 +316,18 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const previewFormat = render.state === "done" ? render.format : format;
   const length = render.state === "done" ? render.seconds : plannedSeconds(plan);
 
   return (
     <main data-screen-label="06 Export" className={s.main}>
-      <div className={s.mid}>
-        <div className={s.preview} style={{ aspectRatio: previewFormat === "4:5" ? "4 / 5" : "9 / 16" }}>
-          <canvas ref={canvasRef} className={s.renderCanvas} hidden={render.state !== "rendering" && render.state !== "preparing"} aria-label="Video being created" />
-          {render.state === "done" ? (
-            <video key={render.url} className={s.finalVideo} src={render.url} controls playsInline autoPlay />
-          ) : busy ? (
-            <div className={s.renderOverlay} aria-live="polite">
-              {render.state === "preparing" ? "Lining up your takes…" : `Creating your video · ${Math.round(render.progress * 100)}%`}
-              <div className={s.scrub}><div style={{ width: `${render.state === "rendering" ? render.progress * 100 : 0}%` }} /></div>
-            </div>
-          ) : current ? (
-            <>
-              <video
-                key={current.take.id}
-                className={s.takeVideo}
-                src={current.take.url}
-                controls
-                playsInline
-                onLoadedMetadata={fixDuration}
-                onEnded={() => setClip((c) => (c + 1 < cut.length ? c + 1 : 0))}
-                autoPlay={clip > 0}
-              />
-              <span className={s.mediaCaption} style={{ top: 14, left: 16 }}>
-                ROUGH CUT · {Math.min(clip, cut.length - 1) + 1} OF {cut.length}
-              </span>
-            </>
-          ) : (
-            <div className={s.cameraLabel} style={{ color: "var(--vd-text-muted)" }}>KEEP A TAKE TO SEE YOUR ROUGH CUT</div>
-          )}
-        </div>
-
-        <div className={s.stack} style={{ gap: 28 }}>
+      <div className={s.exportWrap}>
+        <div className={s.exportHead}>
           <div className={s.stack} style={{ gap: 10 }}>
             <Badge tone={render.state === "done" ? "accent" : ready ? "accent" : "warning"} dot={render.state === "done" || ready}>
-              {render.state === "done" ? "Your video is ready" : ready ? "Ready to create" : "Not ready yet"}
+              {render.state === "done" ? "Your video is ready" : ready ? "Edit, then export" : "Not ready yet"}
             </Badge>
             <h1 className={s.exportTitle}>{clock(length)} · {cut.length} {cut.length === 1 ? "shot" : "shots"}</h1>
           </div>
-
-          {madeOnce && <ImproveCard onImprove={improve} busy={busy} revisions={finish.revisions} />}
-
           <div className={s.checks}>
             {checks.map((c) => (
               <div key={c.label} className={s.check}>
@@ -336,18 +336,35 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
               </div>
             ))}
           </div>
+        </div>
 
-          <CaptionsCard clips={speaking} state={finish} />
-          <ExtrasCard state={finish} onPlan={askForEdit} planStale={planStale} />
+        {cut.length ? (
+          <Editor
+            timeline={timeline}
+            plan={editorPlan}
+            onPlan={onHandEdit}
+            state={finish}
+            format={format}
+            hookTitle={hookTitle}
+            shotTitles={plan.shots.map((x) => x.title)}
+            onAddFiles={addFiles}
+            onCaption={onCaption}
+            exporting={render.state === "rendering" ? render.progress : render.state === "preparing" ? 0 : null}
+          />
+        ) : (
+          <div className={s.createCard}>
+            <span className={s.hint}>Keep at least one take to start editing your video.</span>
+          </div>
+        )}
 
+        <div className={s.mid}>
+        <div className={s.stack} style={{ gap: 28 }}>
           <div className={s.createCard}>
             <div className={s.stack} style={{ gap: 4 }}>
-              <span className={s.createTitle}>Create your video</span>
+              <span className={s.createTitle}>Export</span>
               <span className={s.hint}>
-                Your takes in order with dead air trimmed and levels evened out, animated captions, your hook on screen, the
-                Director’s cutaways and callouts, music mixed under your voice
-                {finish.brand ? ", and the EdAI logo and end card" : ""}. It plays through once while it’s made — keep this tab
-                open.
+                Makes the file exactly as the preview plays it — 1080p, ready to post. It plays through once while it’s made, so
+                keep this tab open.
               </span>
             </div>
             <div className={s.stack} style={{ gap: 8 }}>
@@ -356,6 +373,16 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
             </div>
             <LookControls state={finish} hookTitle={hookTitle} disabled={busy} />
 
+            <canvas ref={canvasRef} className={s.exportCanvas} aria-hidden />
+            {render.state === "done" && (
+              <video key={render.url} className={s.exportResult} src={render.url} controls playsInline style={{ aspectRatio: render.format === "4:5" ? "4 / 5" : "9 / 16" }} />
+            )}
+            {busy && (
+              <div className={s.stack} style={{ gap: 6 }} aria-live="polite">
+                <span className={s.hint}>{render.state === "preparing" ? "Lining up your clips…" : `Making your video · ${Math.round(render.progress * 100)}%`}</span>
+                <div className={s.scrubLight}><div style={{ width: `${render.state === "rendering" ? render.progress * 100 : 0}%` }} /></div>
+              </div>
+            )}
             {render.state === "error" && <p className={s.error} role="alert">{render.message}</p>}
             {mime && !mime.includes("mp4") && (
               <span className={s.hint}>This browser saves WebM. Instagram needs MP4 — create your video in Chrome, Edge or Safari for MP4.</span>
@@ -368,11 +395,11 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
                 <>
                   <Button size="lg" icon="download" onClick={() => download(render.url, fileName(render.mime))}>Download video</Button>
                   {canShare && <Button variant="secondary" size="lg" icon="share" onClick={share}>Share</Button>}
-                  <Button variant="ghost" size="lg" icon="rotate-ccw" onClick={() => create()}>Make again</Button>
+                  <Button variant="ghost" size="lg" icon="rotate-ccw" onClick={() => create()}>Export again</Button>
                 </>
               ) : (
-                <Button size="lg" icon="sparkles" onClick={() => create()} disabled={!cut.length || !mime}>
-                  Create my video
+                <Button size="lg" icon="download" onClick={() => create()} disabled={!cut.length || !mime}>
+                  Export my video
                 </Button>
               )}
             </div>
@@ -394,6 +421,13 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
               {caption && <Button variant="ghost" size="md" icon={copied ? "check" : undefined} onClick={copyCaption}>{copied ? "Copied" : "Copy"}</Button>}
             </div>
           </div>
+
+        </div>
+
+        <div className={s.stack} style={{ gap: 28 }}>
+          <ImproveCard onImprove={improve} busy={busy} revisions={finish.revisions} />
+          <CaptionsCard clips={speaking} state={finish} />
+          <ExtrasCard state={finish} onPlan={askForEdit} planStale={planStale} />
 
           <div className={s.settings}>
             <div className={s.setting}>
@@ -417,6 +451,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
             </Button>
             <Button variant="ghost" size="sm" onClick={downloadScript}>Script</Button>
           </div>
+        </div>
         </div>
       </div>
     </main>
