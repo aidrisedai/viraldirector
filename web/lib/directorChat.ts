@@ -46,6 +46,7 @@ function contextBlock(req: ChatRequest): string {
     `mode: ${req.mode}`,
     `current step: ${step}`,
     `concept: ${brief.concept}`,
+    ...(brief.story ? [`approved story the plan was built from:\n${brief.story}`] : []),
     `goal: ${brief.goal} · platform: ${brief.platform} · audience: ${brief.audience} · target length: ${targetSeconds(brief)}s`,
     `chosen hook (${plan.hooks[hook].kind}): ${plan.hooks[hook].line}`,
     "beats:",

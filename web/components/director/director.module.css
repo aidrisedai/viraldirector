@@ -338,3 +338,33 @@ button.setting { cursor: pointer; }
   display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;
   background: var(--cream-50); border: 1px solid var(--vd-hairline); border-radius: var(--radius-card);
 }
+
+/* ---------- Story mode (Concept) ---------- */
+.modeSwitch { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.scenarioInput {
+  font: inherit; font-size: 17px; line-height: 1.55; color: var(--black); width: 100%;
+  border: none; outline: none; resize: vertical; padding: 0; background: transparent; min-height: 8em;
+}
+.scenarioInput::placeholder { color: var(--vd-text-divider); }
+.writerGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 8px; }
+.writer {
+  composes: format; flex-direction: column; align-items: flex-start; gap: 4px;
+}
+.writerName { font-size: 15px; font-weight: 600; color: var(--black); }
+.writerBlurb { font-size: 13px; line-height: 1.45; color: var(--vd-text-muted); }
+.storyCard { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+.storyHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+.questionText { font-family: var(--font-serif-display); font-size: 18px; line-height: 1.4; color: var(--black); }
+.answerInput { composes: captionInput; width: 100%; }
+.storyTitle {
+  font: inherit; font-family: var(--font-serif-display); font-size: 28px; line-height: 1.2; color: var(--black);
+  border: none; border-bottom: 1px solid transparent; outline: none; padding: 0 0 4px; background: transparent; width: 100%;
+}
+.storyTitle:focus { border-bottom-color: var(--brand-accent); }
+.scriptInput { composes: captionInput; width: 100%; font-size: 16px; line-height: 1.6; white-space: pre-wrap; }
+.writerNote {
+  margin: 0; padding: 12px 14px; font-size: 14px; line-height: 1.5; color: var(--vd-text-body);
+  background: var(--cream-50); border-radius: var(--radius-card);
+}
+.reviseRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.reviseRow > input { min-width: min(100%, 240px); }

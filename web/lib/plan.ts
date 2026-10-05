@@ -9,6 +9,7 @@ export const AUDIENCES = ["Teens 13–18", "Parents"] as const;
 export const FORMATS = ["Director picks", "Talking head", "Myth-busting", "Story", "Tutorial"] as const;
 
 export const CONCEPT_MAX = 280;
+export const STORY_MAX = 3000;
 
 export const BriefSchema = z.object({
   concept: z.string().trim().min(3, "Tell the Director a little more.").max(CONCEPT_MAX),
@@ -17,6 +18,8 @@ export const BriefSchema = z.object({
   platform: z.enum(PLATFORMS),
   audience: z.enum(AUDIENCES),
   format: z.enum(FORMATS),
+  /** A story the creator approved in story mode (see lib/story.ts); empty for a one-sentence idea. */
+  story: z.string().trim().max(STORY_MAX).default(""),
 });
 export type Brief = z.infer<typeof BriefSchema>;
 
@@ -27,6 +30,7 @@ export const DEFAULT_BRIEF: Brief = {
   platform: "Reels / TikTok",
   audience: "Teens 13–18",
   format: "Director picks",
+  story: "",
 };
 
 export const targetSeconds = (brief: Pick<Brief, "length">) => parseInt(brief.length, 10);

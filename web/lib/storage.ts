@@ -1,4 +1,6 @@
+import { z } from "zod";
 import { BriefSchema, PlanSchema, type Brief, type Plan } from "./plan";
+import { ANSWER_MAX, QUESTIONS_MAX, SCENARIO_MAX, StorySchema, WriterRequestSchema } from "./story";
 
 // The plan survives a refresh; recorded takes are in-memory blobs and don't.
 const KEY = "viraldirector:project:v1";
@@ -39,5 +41,37 @@ export function saveProject(project: SavedProject) {
 export function clearProject() {
   try {
     window.localStorage.removeItem(KEY);
+    window.localStorage.removeItem(STORY_KEY);
+  } catch {}
+}
+
+// ---------- Story mode draft (Concept step) ----------
+
+const STORY_KEY = "viraldirector:story:v1";
+
+const SavedStorySchema = z.object({
+  mode: z.enum(["idea", "story"]),
+  scenario: z.string().max(SCENARIO_MAX),
+  writer: WriterRequestSchema.shape.writer,
+  questions: z.array(z.string().max(300)).max(QUESTIONS_MAX),
+  answers: z.array(z.string().max(ANSWER_MAX)).max(QUESTIONS_MAX),
+  story: StorySchema.nullable(),
+});
+export type SavedStory = z.infer<typeof SavedStorySchema>;
+
+export function loadStory(): SavedStory | null {
+  try {
+    const raw = window.localStorage.getItem(STORY_KEY);
+    if (!raw) return null;
+    const parsed = SavedStorySchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStory(story: SavedStory) {
+  try {
+    window.localStorage.setItem(STORY_KEY, JSON.stringify(story));
   } catch {}
 }

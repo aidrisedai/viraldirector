@@ -58,6 +58,7 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 | `DIRECTOR_MODEL` | No | Defaults to `claude-opus-5-5`. |
 | `PLAN_RATE_LIMIT` | No | Plans per IP per 10 minutes (default 10). |
 | `EDIT_RATE_LIMIT` | No | Director edit plans per IP per 10 minutes (default 10). |
+| `WRITER_RATE_LIMIT` | No | Writer questions, drafts and revisions per IP per 10 minutes (default 20). |
 | `CHAT_RATE_LIMIT` | No | Questions and feedback requests to the Director per IP per 10 minutes (default 40). |
 | `NEXT_PUBLIC_SITE_URL` | No | Canonical URL for share metadata. |
 
@@ -65,12 +66,21 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 
 | Step | What's real |
 | --- | --- |
-| Concept | Brief (concept, goal, length, platform, audience, format). Dictation via the browser's speech recognition where available. |
+| Concept | Brief (concept, goal, length, platform, audience, format). Dictation via the browser's speech recognition where available. Two ways in: **Quick idea** (one sentence) or **Tell the full story** (below). |
 | Plan | `POST /api/plan` calls Claude with the PRD's virality framework and a JSON-schema structured output, then validates it with Zod (`lib/plan.ts`). Three hooks; picking one rewrites the hook beat and the hook shot's line. |
 | Shots | Call sheet grouped by location, required/optional, framing/lighting/delivery. Lines are editable. Upload a clip instead of recording. |
 | Record | Live webcam with thirds grid, eye line, caption safe zone; 3-second countdown; auto-stop at target + 0.5s; teleprompter advances with the take; space starts/stops. |
 | Review | Plays the take back. Automatic checks measured in the browser: duration vs. target, audio level/clipping, whether speech was heard. Keep or retake. |
 | Export | **Create my video** renders the finished, postable video in the browser (below). Quality gate (hook ≤ 3s, length, clipping, required shots), a Director-written post caption, and raw takes/script downloads. |
+
+**Tell the full story** (`components/director/StoryWriter.tsx`, `POST /api/writer`, `lib/writer.ts`, `lib/story.ts`):
+the creator explains the scenario in their own words (up to 4,000 characters, typed or dictated) and picks a writer —
+Screenwriter, Copywriter, Journalist or Comedy writer, each a different craft prompt. The writer asks up to three
+follow-up questions (skippable), then writes a title, a one-line logline and a spoken script with `[visual notes]`, sized
+to the target length (about 2.6 words per second; the draft shows its estimated spoken length). The creator can edit it
+by hand or ask for revisions. On handoff the logline becomes the concept and the script goes to the Director as
+`brief.story`; the Director builds hooks, beats and shots from it and keeps its lines where they fit. Writers never
+invent facts. The draft is saved in `localStorage` until **New video**. Needs the API key (no sample writer).
 
 **Ask the Director** (header button, every step) answers questions about the video with the plan and current
 shot as context (`POST /api/director`):
@@ -124,6 +134,7 @@ The plan persists in `localStorage`. Takes stay in memory only, and the page war
 - `lib/plan.ts`: brief/plan schemas, sample plan, helpers
 - `lib/takes.ts`: take review, export gate, file naming, script export
 - `app/api/director/route.ts`, `lib/directorChat.ts`, `lib/chat.ts`: Ask the Director (ask / line / take modes)
+- `app/api/writer/route.ts`, `lib/writer.ts`, `lib/story.ts`: story mode (writers, questions, drafts, revisions)
 - `lib/glossary.ts`: plain-language definitions used by tappable terms and instant answers
 - `components/director/`: the six steps; `useRecorder.ts` is camera + MediaRecorder + audio metering + transcript;
   `DirectorPanel.tsx` + `useDirectorChat.ts` are the chat; `frames.ts` grabs frames for take feedback

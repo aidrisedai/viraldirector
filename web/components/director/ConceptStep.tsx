@@ -1,53 +1,25 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ds/Button";
 import { Icon } from "@/components/ds/Icon";
-import { speechRecognition, type Recognition } from "@/lib/speech";
 import { AUDIENCES, CONCEPT_MAX, FORMATS, GOALS, LENGTHS, PLATFORMS, SAMPLE_CONCEPT, type Brief } from "@/lib/plan";
 import { Chips } from "./Chips";
+import { StoryWriter, storyReady, useStoryWriter } from "./StoryWriter";
+import { useDictation } from "./useDictation";
 import s from "./director.module.css";
 
 type Props = {
   brief: Brief;
   onChange: (patch: Partial<Brief>) => void;
-  onNext: () => void;
+  /** Plan the video; `patch` is applied to the brief first (the story, in story mode). */
+  onNext: (patch: Partial<Brief>) => void;
   loading: boolean;
   error: string;
 };
 
-const noSubscribe = () => () => {};
-
 export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) {
-  const canDictate = useSyncExternalStore(noSubscribe, () => Boolean(speechRecognition()), () => false);
-  const [listening, setListening] = useState(false);
-  const recognition = useRef<Recognition | null>(null);
-  const conceptRef = useRef(brief.concept);
-
-  useEffect(() => {
-    conceptRef.current = brief.concept;
-  }, [brief.concept]);
-  useEffect(() => () => recognition.current?.stop(), []);
-
-  const toggleDictation = () => {
-    if (listening) {
-      recognition.current?.stop();
-      return;
-    }
-    const Ctor = speechRecognition();
-    if (!Ctor) return;
-    const r = new Ctor();
-    r.lang = navigator.language || "en-US";
-    r.interimResults = false;
-    r.continuous = true;
-    r.onresult = (e) => {
-      let text = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) text += e.results[i][0].transcript;
-      if (text) onChange({ concept: `${conceptRef.current} ${text.trim()}`.trim().slice(0, CONCEPT_MAX) });
-    };
-    r.onend = r.onerror = () => setListening(false);
-    recognition.current = r;
-    r.start();
-    setListening(true);
-  };
+  const dictation = useDictation(brief.concept, (concept) => onChange({ concept }), CONCEPT_MAX);
+  const { goal, length, platform, audience, format } = brief;
+  const writer = useStoryWriter({ goal, length, platform, audience, format });
+  const storyMode = writer.mode === "story";
 
   const options = [
     { label: "Goal", key: "goal", values: GOALS },
@@ -56,7 +28,12 @@ export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) 
     { label: "Audience", key: "audience", values: AUDIENCES },
   ] as const;
 
-  const ready = brief.concept.trim().length >= 3;
+  const ready = storyMode ? storyReady(writer) && !writer.busy : brief.concept.trim().length >= 3;
+  const submit = () => {
+    if (!ready || loading) return;
+    if (storyMode && writer.story) onNext({ concept: writer.story.logline.trim(), story: writer.story.script.trim() });
+    else onNext({ story: "" });
+  };
 
   return (
     <main data-screen-label="01 Concept" className={`${s.main} ${s.conceptMain}`}>
@@ -64,41 +41,57 @@ export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) 
         className={s.conceptCol}
         onSubmit={(e) => {
           e.preventDefault();
-          if (ready && !loading) onNext();
+          submit();
         }}
       >
         <div className={s.stack} style={{ gap: 12 }}>
           <span className={s.eyebrow}>NEW VIDEO</span>
           <h1 className={s.conceptTitle}>What’s your video about?</h1>
-          <p className={s.lede}>One sentence is enough. The Director writes the hook, script and shot list.</p>
+          <div className={s.modeSwitch} role="group" aria-label="How do you want to start?">
+            <button type="button" aria-pressed={!storyMode} className={`${s.chip} ${!storyMode ? s.chipOn : ""}`} onClick={() => writer.patch({ mode: "idea" })}>
+              Quick idea
+            </button>
+            <button type="button" aria-pressed={storyMode} className={`${s.chip} ${storyMode ? s.chipOn : ""}`} onClick={() => writer.patch({ mode: "story" })}>
+              Tell the full story
+            </button>
+          </div>
+          <p className={s.lede}>
+            {storyMode
+              ? "Explain what happened in your own words and pick a writer. They’ll ask a few questions, write your story, and you approve it before the Director plans the shots."
+              : "One sentence is enough. The Director writes the hook, script and shot list."}
+          </p>
         </div>
 
-        <div className={s.ideaBox}>
-          <textarea
-            className={s.ideaInput}
-            aria-label="Video concept"
-            placeholder={SAMPLE_CONCEPT}
-            rows={1}
-            maxLength={CONCEPT_MAX}
-            value={brief.concept}
-            onChange={(e) => onChange({ concept: e.target.value })}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                e.currentTarget.form?.requestSubmit();
-              }
-            }}
-            autoFocus
-          />
-          <div className={s.ideaFoot}>
-            <span>{listening ? "Listening…" : canDictate ? "Type or dictate" : "Type your idea"}</span>
-            {canDictate && (
-              <Button variant="outline" size="sm" icon="mic" onClick={toggleDictation} aria-pressed={listening}>
-                {listening ? "Stop" : "Dictate"}
-              </Button>
-            )}
+        {storyMode ? (
+          <StoryWriter w={writer} brief={brief} />
+        ) : (
+          <div className={s.ideaBox}>
+            <textarea
+              className={s.ideaInput}
+              aria-label="Video concept"
+              placeholder={SAMPLE_CONCEPT}
+              rows={1}
+              maxLength={CONCEPT_MAX}
+              value={brief.concept}
+              onChange={(e) => onChange({ concept: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }
+              }}
+              autoFocus
+            />
+            <div className={s.ideaFoot}>
+              <span>{dictation.listening ? "Listening…" : dictation.supported ? "Type or dictate" : "Type your idea"}</span>
+              {dictation.supported && (
+                <Button variant="outline" size="sm" icon="mic" onClick={dictation.toggle} aria-pressed={dictation.listening}>
+                  {dictation.listening ? "Stop" : "Dictate"}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className={s.optionGrid}>
           {options.map(({ label, key, values }) => (
@@ -132,8 +125,9 @@ export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) 
 
         <div className={s.submitRow}>
           {error && <p className={s.error} role="alert">{error}</p>}
+          {storyMode && !writer.story && <p className={s.hint}>Once your story is written and you’re happy with it, hand it to the Director.</p>}
           <Button type="submit" size="lg" iconRight={loading ? undefined : "arrow-right"} disabled={!ready || loading}>
-            {loading ? "Directing your video…" : "Direct my video"}
+            {loading ? "Directing your video…" : storyMode ? "Give my story to the Director" : "Direct my video"}
           </Button>
         </div>
         {loading && <p className={s.hint} aria-live="polite">The Director is writing hooks, a beat sheet and your shot list. This takes up to a minute.</p>}

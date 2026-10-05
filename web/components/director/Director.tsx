@@ -74,14 +74,16 @@ export function Director() {
   const { ask, setOpen: setPanelOpen } = chat;
   const directorActions = useMemo(() => ({ ask, open: () => setPanelOpen(true) }), [ask, setPanelOpen]);
 
-  const direct = useCallback(async () => {
+  const direct = useCallback(async (patch: Partial<Brief> = {}) => {
+    const next = { ...brief, ...patch };
+    setBrief(next);
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(brief),
+        body: JSON.stringify(next),
       });
       const data = (await res.json().catch(() => ({ error: "The Director didn’t respond. Try again." }))) as PlanResponse;
       if ("error" in data) throw new Error(data.error);
