@@ -69,7 +69,7 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}
 | Shots | Call sheet grouped by location, required/optional, framing/lighting/delivery. Lines are editable. Upload a clip instead of recording. |
 | Record | Live webcam with thirds grid, eye line, caption safe zone; 3-second countdown; auto-stop at target + 0.5s; teleprompter advances with the take; space starts/stops. |
 | Review | Plays the take back. Automatic checks measured in the browser: duration vs. target, audio level/clipping, whether speech was heard. Keep or retake. |
-| Export | Rough cut plays kept takes back to back; quality gate (hook ≤ 3s, length, clipping, required shots); downloads numbered takes and the script. |
+| Export | **Create my video** renders the finished, postable video in the browser (below). Quality gate (hook ≤ 3s, length, clipping, required shots), a Director-written post caption, and raw takes/script downloads. |
 
 **Ask the Director** (header button, every step) answers questions about the video with the plan and current
 shot as context (`POST /api/director`):
@@ -81,6 +81,21 @@ shot as context (`POST /api/director`):
 - **Take feedback:** on Review, the Director sees four frames from the take (center-cropped to 9:16), the audio
   measurements and, where the browser supports speech recognition, a transcript, then says keep or retake.
   Chrome and Edge send the audio to their own speech service for this; Safari transcribes on-device; Firefox has none.
+
+**Create my video** (`components/director/render/`, logic in `lib/edit.ts`) turns the kept takes into one video,
+entirely in the browser — nothing is uploaded:
+
+- Takes in script order; dead air trimmed from each clip's start and end (speech detection on the decoded audio).
+- Each clip's speech level-matched to a common target, plus a peak limiter: about −12 to −16 LUFS, typical for Reels/TikTok.
+- Word-by-word captions (current word on an emerald pill), timed across the detected speech; uses the transcript
+  when there is one, else the script line. Timing is estimated, not word-level speech recognition.
+- The hook as an animated title over the first seconds; slow push-in/out, a punch-in on the hook, jump-cut zooms
+  between caption phrases, and a flash on each cut.
+- A generated music bed (Calm build / Upbeat / none) that ducks under speech — synthesized, so royalty-free.
+- 9:16 (1080×1920) or 4:5 (1080×1350). MP4 (H.264/AAC) in Chrome, Edge and Safari; WebM in Firefox (Instagram needs MP4).
+- Download, or Share on phones (Web Share API) straight to Instagram, TikTok, etc.
+
+Rendering is real time (a 45s video takes about 45s) and needs the tab to stay visible.
 
 The plan persists in `localStorage`. Takes stay in memory only, and the page warns before a refresh discards them.
 
@@ -101,8 +116,7 @@ The plan persists in `localStorage`. Takes stay in memory only, and the page war
 - **Rate limiting is per server instance.** On serverless or multi-instance hosting, also cap `/api/plan` with your
   host's firewall/WAF, or swap `lib/rateLimit.ts` for a shared store. Set a monthly spend limit on the Anthropic key.
 - **No accounts or server storage.** Projects live in one browser; takes are lost on refresh.
-- **Not built yet (PRD P0s that need a backend):** automatic assembly into one edited video, burned-in captions,
-  music, multi-ratio rendering, and Director scoring of framing/energy/line accuracy (needs speech-to-text and
-  vision). Export gives creators their numbered takes to finish in any editor.
+- **Video creation limits:** B-roll plays in sequence rather than layered over the voice; captions are timed by
+  estimate, not word-level speech recognition; 16:9 and 1:1 aren't offered yet; rendering is real time in the tab.
 - CSP allows `'unsafe-inline'` scripts because Next's App Router inlines bootstrap scripts; move to nonces via
   middleware if you need a strict CSP.

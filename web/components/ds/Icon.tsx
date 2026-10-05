@@ -1,5 +1,5 @@
 import {
-  ArrowRight, Check, ChevronRight, Download, MessageCircle, Mic, Pencil, Play, RotateCcw, ScanFace,
+  ArrowRight, Check, ChevronRight, Download, MessageCircle, Mic, Pencil, Play, RotateCcw, ScanFace, Share2,
   Sparkles, Sun, Upload, Video, X, Zap, type LucideIcon,
 } from "lucide-react";
 import type { CSSProperties } from "react";
@@ -16,6 +16,7 @@ const ICONS = {
   play: Play,
   "rotate-ccw": RotateCcw,
   "scan-face": ScanFace,
+  share: Share2,
   sparkles: Sparkles,
   sun: Sun,
   upload: Upload,
