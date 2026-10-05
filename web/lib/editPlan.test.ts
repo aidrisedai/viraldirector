@@ -8,13 +8,13 @@ const take = (shot: number): Take => ({
   clipped: 0, voiced: 0.6, transcript: null, source: "camera",
 });
 const seg = (shot: number, kind: Segment["kind"], from: number, to: number, speech: boolean): Segment => ({
-  shot, take: take(shot), kind, from, to, gain: 1, speech,
+  shot, take: take(shot), kind, from, to, gain: 1, speech, voiceLevel: speech ? 0.25 : null,
   words: speech ? [{ word: "Bad", start: from + 0.1, end: from + 0.5 }, { word: "ideas.", start: from + 0.5, end: from + 1 }] : [],
 });
 
 // hook (3s), a-roll (8s), b-roll (3s), a-roll (6s)
 const timeline = [seg(0, "hook", 0.5, 3.5, true), seg(2, "a-roll", 1, 9, true), seg(3, "b-roll", 0, 3, false), seg(5, "a-roll", 0.4, 6.4, true)];
-const empty: EditPlan = { cutaways: [], callouts: [], emphasis: [], endCta: "", summary: "" };
+const empty: EditPlan = { drop: [], captionFixes: [], cutaways: [], callouts: [], emphasis: [], endCta: "", summary: "" };
 
 describe("fallbackPlan", () => {
   it("lays B-roll over the end of the talking clip before it", () => {

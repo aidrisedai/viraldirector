@@ -132,12 +132,14 @@ export type Segment = {
   gain: number;
   /** Whether the clip carries speech (music ducks under it). */
   speech: boolean;
+  /** Speech RMS after `gain`; null without speech. Music is mixed relative to this. */
+  voiceLevel: number | null;
 };
 
 const LEAD = 0.12; // keep a breath before the first word
 const TAIL = 0.3; // and let the last word land
 // Speech level that lands near the loudness social platforms play at (about −14 to −16 LUFS for voice).
-const TARGET_RMS = 0.25;
+export const TARGET_RMS = 0.25;
 
 /** Caption text for a kept take: the creator's edit, else what was said, else the script. */
 export function captionText(take: Take, shot: Shot, edited?: string): string {
@@ -175,7 +177,8 @@ export function buildTimeline(
     const words = speech ? retimeWords(text, exact, onset, Math.min(offset!, to)) : [];
     const gain = a?.speechRms ? Math.min(8, Math.max(0.25, TARGET_RMS / a.speechRms)) : 1;
 
-    segments.push({ shot: i, take, kind: shot.type, from, to, words, gain, speech });
+    const voiceLevel = speech && a?.speechRms ? a.speechRms * gain : null;
+    segments.push({ shot: i, take, kind: shot.type, from, to, words, gain, speech, voiceLevel });
   });
   return segments;
 }
@@ -190,5 +193,5 @@ export const FORMATS = {
 } as const;
 export type FormatKey = keyof typeof FORMATS;
 
-export const MUSIC_STYLES = ["Calm build", "Upbeat", "No music"] as const;
+export const MUSIC_STYLES = ["Calm build", "Upbeat", "My music", "No music"] as const;
 export type MusicStyle = (typeof MUSIC_STYLES)[number];

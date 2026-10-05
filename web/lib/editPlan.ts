@@ -17,6 +17,7 @@ export type Extra = {
 
 export const EXTRAS_MAX = 6;
 export const NOTES_MAX = 1000;
+export const FEEDBACK_MAX = 1000;
 
 // ---------- The Director's edit decision list ----------
 
@@ -42,6 +43,10 @@ const CalloutSchema = z.object({
 });
 
 export const EditPlanSchema = z.object({
+  /** Timeline segments (0-based) to leave out of the video. */
+  drop: z.array(z.number().int().min(0)).max(12).default([]),
+  /** Corrected caption text for a speaking segment (it replaces the transcript for that clip). */
+  captionFixes: z.array(z.object({ segment: z.number().int().min(0), text: z.string().max(400) })).max(12).default([]),
   cutaways: z.array(CutawaySchema).max(16),
   callouts: z.array(CalloutSchema).max(10),
   /** Words to emphasise in the captions, per segment. */
@@ -56,6 +61,42 @@ export type Cutaway = z.infer<typeof CutawaySchema>;
 export type Callout = z.infer<typeof CalloutSchema>;
 
 export const DEFAULT_CTA = "Follow for more";
+
+// ---------- Look of the video (captions, motion, title, music level) ----------
+
+export const CAPTION_STYLES = ["Pop", "Karaoke", "Bold", "Minimal", "Off"] as const;
+export const CAPTION_SIZES = ["S", "M", "L"] as const;
+export const CAPTION_POSITIONS = ["Middle", "Lower"] as const;
+export const TRANSITIONS = ["Flash", "Whip", "Zoom", "Cut"] as const;
+export const ENERGIES = ["Calm", "Punchy"] as const;
+
+export const StyleSchema = z.object({
+  /** Pop: word-by-word on a sliding pill. Karaoke: the line fills as it's spoken. Bold: one or two huge words slam in. Minimal: clean sentence-case lines. */
+  captions: z.enum(CAPTION_STYLES),
+  captionSize: z.enum(CAPTION_SIZES),
+  captionPosition: z.enum(CAPTION_POSITIONS),
+  /** How one clip turns into the next. */
+  transition: z.enum(TRANSITIONS),
+  /** Camera movement: Punchy adds punch-ins and jump-cut zooms; Calm keeps slow drifts. */
+  energy: z.enum(ENERGIES),
+  /** Animated title over the opening; empty uses the chosen hook. */
+  title: z.string().max(90),
+  showTitle: z.boolean(),
+  /** Music level, 0–1. Even at 1 the music stays well under the voice. */
+  musicVolume: z.number().min(0).max(1),
+});
+export type Style = z.infer<typeof StyleSchema>;
+
+export const DEFAULT_STYLE: Style = {
+  captions: "Pop",
+  captionSize: "M",
+  captionPosition: "Middle",
+  transition: "Flash",
+  energy: "Punchy",
+  title: "",
+  showTitle: true,
+  musicVolume: 0.7,
+};
 
 const ms = (n: number) => Math.round(n * 1000) / 1000;
 const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
@@ -115,7 +156,15 @@ export function normalizePlan(plan: EditPlan, timeline: Segment[], extras: Pick<
 
   const emphasis = plan.emphasis.filter((e) => timeline[e.segment]?.words.some((w) => norm(w.word) === norm(e.word)));
 
-  return { cutaways, callouts, emphasis, endCta: plan.endCta.trim() || DEFAULT_CTA, summary: plan.summary.trim() };
+  // Never drop every speaking clip: the video needs a voice.
+  let drop = [...new Set(plan.drop)].filter((i) => i < timeline.length).sort((a, b) => a - b);
+  if (!timeline.some((seg, i) => seg.speech && !drop.includes(i))) drop = drop.filter((i) => !timeline[i].speech);
+  if (drop.length >= timeline.length) drop = [];
+  const captionFixes = plan.captionFixes
+    .map((f) => ({ segment: f.segment, text: f.text.trim() }))
+    .filter((f) => f.text && timeline[f.segment]?.speech);
+
+  return { drop, captionFixes, cutaways, callouts, emphasis, endCta: plan.endCta.trim() || DEFAULT_CTA, summary: plan.summary.trim() };
 }
 
 /**
@@ -154,6 +203,8 @@ export function fallbackPlan(timeline: Segment[], extras: Pick<Extra, "id" | "ki
     extras.length > 0 && `placed ${extras.length} added ${extras.length === 1 ? "item" : "items"} over the talking parts`,
   ].filter(Boolean);
   return {
+    drop: [],
+    captionFixes: [],
     cutaways,
     callouts: [],
     emphasis: [],
@@ -179,8 +230,9 @@ export type ComposedEdit = { sequence: ComposedSegment[]; endCta: string };
 export function composeEdit(timeline: Segment[], plan: EditPlan): ComposedEdit {
   const usedShots = new Set(plan.cutaways.filter((c) => c.source.startsWith("shot:")).map((c) => Number(c.source.slice(5))));
   const sequence: ComposedSegment[] = [];
+  const dropped = new Set(plan.drop);
   timeline.forEach((seg, i) => {
-    if (usedShots.has(seg.shot) && !seg.speech) return;
+    if (dropped.has(i) || (usedShots.has(seg.shot) && !seg.speech)) return;
     const overlays: Overlay[] = plan.cutaways
       .filter((c) => c.segment === i)
       .flatMap((c): Overlay[] => {
@@ -209,6 +261,8 @@ export const EditRequestSchema = z.object({
         kind: z.string().max(20),
         seconds: z.number().min(0).max(120),
         speech: z.boolean(),
+        /** Where it starts in the current video (seconds), or null when it isn't in it. */
+        startsAt: z.number().min(0).nullable(),
         /** Caption words with times relative to the start of the segment. */
         words: z.array(z.object({ word: z.string().max(40), start: z.number(), end: z.number() })).max(300),
       }),
@@ -232,13 +286,31 @@ export const EditRequestSchema = z.object({
   platform: z.string().max(40),
   audience: z.string().max(40),
   hook: z.string().max(200),
+  style: StyleSchema,
+  music: z.enum(["generated", "custom", "none"]),
+  /** For a revision: the edit the creator just watched, and what they want changed. */
+  current: EditPlanSchema.nullable(),
+  feedback: z.string().trim().max(FEEDBACK_MAX),
+  /** Earlier rounds of feedback in this session, oldest first. */
+  history: z.array(z.object({ feedback: z.string().max(FEEDBACK_MAX), summary: z.string().max(500) })).max(6),
 });
 export type EditRequest = z.infer<typeof EditRequestSchema>;
-export type EditResponse = { plan: EditPlan } | { error: string };
+export type EditResponse = { plan: EditPlan; style: Style } | { error: string };
 
-/** The timeline as the Director sees it: segment-relative word times, rounded. */
-export function timelineForDirector(timeline: Segment[], titles: string[]): EditRequest["timeline"] {
+/**
+ * The timeline as the Director sees it: segment-relative word times, rounded, and where each
+ * segment starts in the video the creator watched (with `current` applied).
+ */
+export function timelineForDirector(timeline: Segment[], titles: string[], current: EditPlan | null = null): EditRequest["timeline"] {
   const r = (n: number) => Math.round(n * 100) / 100;
+  const startsAt = new Map<number, number>();
+  if (current) {
+    let t = 0;
+    for (const s of composeEdit(timeline, current).sequence) {
+      startsAt.set(s.shot, r(t));
+      t += s.to - s.from;
+    }
+  }
   return timeline.map((s, i) => ({
     segment: i,
     shot: s.shot,
@@ -246,6 +318,7 @@ export function timelineForDirector(timeline: Segment[], titles: string[]): Edit
     kind: s.kind,
     seconds: r(s.to - s.from),
     speech: s.speech,
+    startsAt: current ? (startsAt.get(s.shot) ?? null) : null,
     words: s.words.map((w) => ({ word: w.word, start: r(Math.max(0, w.start - s.from)), end: r(Math.max(0, w.end - s.from)) })),
   }));
 }

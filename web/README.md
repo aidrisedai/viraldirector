@@ -98,11 +98,19 @@ entirely in the browser — nothing is uploaded:
 
 - Takes in script order; dead air trimmed from each clip's start and end (speech detection on the decoded audio).
 - Each clip's speech level-matched to a common target, plus a peak limiter: about −12 to −16 LUFS, typical for Reels/TikTok.
-- Word-by-word captions (current word on an emerald pill), timed across the detected speech; uses the transcript
-  when there is one, else the script line. Timing is estimated, not word-level speech recognition.
-- The hook as an animated title over the first seconds; slow push-in/out, a punch-in on the hook, jump-cut zooms
-  between caption phrases, and a flash on each cut.
-- A generated music bed (Calm build / Upbeat / none) that ducks under speech — synthesized, so royalty-free.
+- Animated captions (`render/text.ts`) in four styles — **Pop** (word by word on an emerald pill that glides between
+  words), **Karaoke** (the line fills in as it's spoken), **Bold** (one or two huge words slam in with motion blur),
+  **Minimal** (clean sentence-case lines) — in three sizes, mid-frame or lower. Timed from exact word times when
+  available, else across the detected speech.
+- A kinetic opening title (words rise out of a mask over a soft scrim, an emerald rule draws in); stat callouts that
+  wipe open and count their number up; label callouts that slide in behind an emerald bar; spring-in picture cards.
+- Motion: Punchy (punch-in on the hook, jump-cut zooms, pushes on emphasised words) or Calm (slow drifts only), and a
+  transition between clips — Flash, Whip (motion-blurred slide), Zoom or Cut. Motion curves live in `lib/motion.ts`.
+- Music (`render/musicTrack.ts`, `lib/audioMix.ts`): a generated bed (Calm build / Upbeat, synthesized, royalty-free)
+  or **My music** — the creator's own song (MP3/M4A/WAV, up to 60 MB, looped if short). Every track is measured
+  (90th-percentile RMS) and set relative to the quietest speaking clip: its loud parts sit 20 dB under the voice while
+  anyone talks and 9 dB under it in gaps and on the end card, scaled down by the volume slider — so music is never as
+  loud as the voice, however loud the song was mastered.
 - 9:16 (1080×1920) or 4:5 (1080×1350). MP4 (H.264/AAC) in Chrome, Edge and Safari; WebM in Firefox (Instagram needs MP4).
 - Download, or Share on phones (Web Share API) straight to Instagram, TikTok, etc.
 
@@ -120,6 +128,15 @@ Rendering is real time (a 45s video takes about 45s) and needs the tab to stay v
   plan — cutaways over the voice (added clips or planned B-roll), picture-in-picture cards, stat/label callouts,
   emphasised caption words, and the end-card call to action. Plans are clamped to the footage before rendering.
   Without the Director, a built-in edit lays B-roll over the voice and places added items on the talking parts.
+- **Look** (`export/LookControls.tsx`): caption style, size and position, transition, energy, the opening title
+  (rewrite or hide it), music and its volume, branding. The Director picks these with its edit; the creator can change
+  any of them.
+- **Improve this video** (`export/ImproveCard.tsx`): after the video is made, the creator says what to change in plain
+  words ("music is distracting", "at 0:12 the captions cover my face"). The Director gets the current edit, the style,
+  where each segment starts in the video they watched, and earlier rounds, and returns a revised edit and style — it
+  can restyle, move or remove cutaways and callouts, fix caption text, or drop a weak shot — then the video is made
+  again automatically. Without the Director, `lib/revise.ts` handles common requests about captions, motion, title and
+  music level, and says what it can't do.
 - **EdAI branding** (on by default): the official wordmark (`public/brand/`, from the `edai-logo` brand skill) in a
   protected panel top-left over the opening, and an end card with the white brandmark (star over arch), the call to
   action and the tagline "Raising Principled and Ambitious Teens as Builders and Founders" bottom-centre. Per the

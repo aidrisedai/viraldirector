@@ -368,3 +368,19 @@ button.setting { cursor: pointer; }
 }
 .reviseRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .reviseRow > input { min-width: min(100%, 240px); }
+
+/* ---------- Look controls and re-editing (Export) ---------- */
+.look { border: none; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.look:disabled { opacity: .6; }
+.lookRow { display: flex; gap: 12px 20px; flex-wrap: wrap; align-items: center; }
+.songRow {
+  display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px;
+  background: var(--cream-50); border: 1px solid var(--vd-hairline); border-radius: var(--radius-card);
+}
+.songName { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.volumeRow { display: flex; align-items: center; gap: 12px; }
+.volumeRow input[type="range"] { flex: 1; accent-color: var(--brand-accent); min-width: 0; }
+.improveCard { border-color: var(--brand-accent); box-shadow: 0 0 0 3px rgba(31, 166, 122, .18); }
+.revisionList { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--vd-text-body); }
+.revisionList li { display: flex; flex-direction: column; gap: 2px; }
+.revisionAsk { color: var(--vd-text-muted); font-style: italic; }

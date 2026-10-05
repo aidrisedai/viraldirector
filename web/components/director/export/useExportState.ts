@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { EditPlan, Extra } from "@/lib/editPlan";
+import type { MusicStyle } from "@/lib/edit";
+import { DEFAULT_STYLE, type EditPlan, type Extra, type Style } from "@/lib/editPlan";
+import type { MusicTrack } from "../render/musicTrack";
 import type { TakeTranscript } from "../transcribe/transcribe";
 
 export type PlanState = {
@@ -11,7 +13,9 @@ export type PlanState = {
   source: "director" | "builtin";
 };
 
-/** Finishing state that should survive moving between steps: captions, added content, the edit plan. */
+export type Revision = { feedback: string; summary: string };
+
+/** Finishing state that should survive moving between steps: captions, added content, the edit plan, the look, the music. */
 export function useExportState() {
   const [captionEdits, setCaptionEdits] = useState<Record<string, string>>({});
   const [exact, setExact] = useState<Record<string, TakeTranscript>>({});
@@ -19,6 +23,10 @@ export function useExportState() {
   const [notes, setNotes] = useState("");
   const [editPlan, setEditPlan] = useState<PlanState | null>(null);
   const [brand, setBrand] = useState(true);
+  const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
+  const [music, setMusic] = useState<MusicStyle>("Calm build");
+  const [customMusic, setCustomMusic] = useState<MusicTrack | null>(null);
+  const [revisions, setRevisions] = useState<Revision[]>([]);
 
   const reset = useCallback(() => {
     setExtras((all) => {
@@ -30,9 +38,15 @@ export function useExportState() {
     setNotes("");
     setEditPlan(null);
     setBrand(true);
+    setStyle(DEFAULT_STYLE);
+    setRevisions([]);
+    // The creator's song and music choice carry over to the next video.
   }, []);
 
-  return { captionEdits, setCaptionEdits, exact, setExact, extras, setExtras, notes, setNotes, editPlan, setEditPlan, brand, setBrand, reset };
+  return {
+    captionEdits, setCaptionEdits, exact, setExact, extras, setExtras, notes, setNotes, editPlan, setEditPlan,
+    brand, setBrand, style, setStyle, music, setMusic, customMusic, setCustomMusic, revisions, setRevisions, reset,
+  };
 }
 
 export type ExportState = ReturnType<typeof useExportState>;

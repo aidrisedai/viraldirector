@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    return json({ plan: await planEdit(parsed.data) });
+    return json(await planEdit(parsed.data));
   } catch (error) {
     if (error instanceof DirectorError) return json({ error: error.message }, error.status);
     console.error("Unexpected error planning the edit", error);

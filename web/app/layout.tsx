@@ -10,7 +10,7 @@ const baskerville = Libre_Baskerville({
 });
 const outfit = Outfit({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700", "800"],
   variable: "--font-outfit",
 });
 
