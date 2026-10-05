@@ -32,6 +32,21 @@ docker build -t viraldirector .
 docker run -p 3000:3000 --env-file .env.local viraldirector
 ```
 
+### Railway
+
+`railway.json` configures the build (this Dockerfile) and the health check. One-time setup:
+
+1. Railway → **New Project → Deploy from GitHub repo** → `aidrisedai/viraldirector`.
+2. Service **Settings → Source → Root Directory**: `/web`. Set **Config file path** to `/web/railway.json`
+   if Railway doesn't pick it up.
+3. **Variables:** add `ANTHROPIC_API_KEY` (and `ANTHROPIC_WORKSPACE_ID` if the key starts with `sk-ant-usr-`).
+   Railway injects `PORT`; don't set it.
+4. **Settings → Networking → Generate Domain** (HTTPS, which the camera needs). Optionally add a custom domain and
+   set `NEXT_PUBLIC_SITE_URL` to it.
+5. Keep **one replica**: the rate limiter is in memory, so it's exact with one instance and per-instance with more.
+
+Every push to `main` redeploys; a deploy goes live only after `/api/health` responds.
+
 Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample"}`.
 
 ## Environment

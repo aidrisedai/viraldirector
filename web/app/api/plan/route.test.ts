@@ -69,4 +69,11 @@ describe("POST /api/plan", () => {
     expect(statuses.slice(0, 10).every((s) => s === 200)).toBe(true);
     expect(statuses[10]).toBe(429);
   });
+
+  it("can't dodge the rate limit by forging X-Forwarded-For", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+    const statuses = [];
+    for (let i = 0; i < 11; i++) statuses.push((await POST(req(brief, `10.0.0.${i}, 5.5.5.5`))).status);
+    expect(statuses[10]).toBe(429);
+  });
 });
