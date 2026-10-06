@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { Badge } from "@/components/ds/Badge";
 import { Button } from "@/components/ds/Button";
 import type { Shot } from "@/lib/plan";
-import { reviewTake, type Take } from "@/lib/takes";
+import { reviewTake, takeFileName, type Take } from "@/lib/takes";
+import { download } from "./download";
 import { fixDuration } from "./useRecorder";
 import s from "./director.module.css";
 
@@ -94,6 +95,7 @@ export function ReviewStep({ shot, index, take, takeNumber, onRetake, onKeep, on
                 <Button variant="outline" size="lg" onClick={onKeep}>Use this take anyway</Button>
               </>
             )}
+            <Button variant="ghost" size="lg" icon="download" onClick={() => download(take.url, takeFileName(take, shot))}>Download</Button>
           </div>
         </div>
       </div>

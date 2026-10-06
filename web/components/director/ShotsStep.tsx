@@ -2,7 +2,8 @@ import { Fragment, useRef, useState } from "react";
 import { Button } from "@/components/ds/Button";
 import { aiEligibility, videoPrompt } from "@/lib/aiPrompts";
 import { recordingMinutes, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/plan";
-import type { Take } from "@/lib/takes";
+import { takeFileName, type Take } from "@/lib/takes";
+import { download } from "./download";
 import { StockSearch } from "./StockSearch";
 import { Term } from "./Term";
 import { takeFromFile } from "./useRecorder";
@@ -168,6 +169,9 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
             <div className={s.actions}>
               <Button size="lg" icon="video" onClick={onRecord}>{kept[shot] ? "Record again" : "Record this shot"}</Button>
               <Button variant="outline" size="lg" icon="upload" onClick={() => fileRef.current?.click()}>Upload a clip</Button>
+              {kept[shot] && (
+                <Button variant="ghost" size="lg" icon="download" onClick={() => download(kept[shot]!.url, takeFileName(kept[shot]!, cur))}>Download clip</Button>
+              )}
               <input
                 ref={fileRef}
                 type="file"

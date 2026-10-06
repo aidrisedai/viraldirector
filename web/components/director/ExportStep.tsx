@@ -15,6 +15,8 @@ import { reviseLocally } from "@/lib/revise";
 import { plannedSeconds, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/plan";
 import { exportChecks, scriptText, slug, takeFileName, type Take } from "@/lib/takes";
 import { Chips } from "./Chips";
+import { canShareFiles, download, downloadBlob } from "./download";
+import { createZip } from "@/lib/zip";
 import { Editor } from "./editor/Editor";
 import { COMPACT, useMediaQuery } from "./useMediaQuery";
 import { CaptionsCard } from "./export/CaptionsCard";
@@ -40,14 +42,6 @@ type Props = {
   onPostCaption?: (caption: string) => void;
 };
 
-function download(href: string, filename: string) {
-  const a = document.createElement("a");
-  a.href = href;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
 
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
 
@@ -414,12 +408,41 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     } catch {}
   };
 
-  const downloadTakes = async () => {
-    for (const { take, shot } of cut) {
-      download(take.url, takeFileName(take, shot));
-      await new Promise((r) => setTimeout(r, 400)); // Browsers drop rapid back-to-back downloads.
+  // ---------- just the clips ----------
+  // The creator's footage is theirs: every kept clip, untouched, whether or not they use the edit.
+  const [zipping, setZipping] = useState(false);
+  const [clipsError, setClipsError] = useState("");
+  const clipFiles = () => cut.map(({ take, shot }) => new File([take.blob], takeFileName(take, shot), { type: take.blob.type || take.mime }));
+  const downloadAllClips = async () => {
+    setZipping(true);
+    setClipsError("");
+    try {
+      const extras: { name: string; data: string }[] = [{ name: "script.txt", data: scriptText(brief.concept, plan, hook) }];
+      try {
+        const edit = await composed();
+        const srt = toSrt(edit);
+        if (srt) extras.push({ name: "captions.srt", data: srt });
+        extras.push({ name: `edit-prompt-${finish.version.toLowerCase()}.md`, data: await makeBrief() });
+      } catch {
+        // The clips matter most; captions and the prompt are a bonus.
+      }
+      if (credits.length) extras.push({ name: "credits.txt", data: `Stock footage\n${credits.join("\n")}\n` });
+      const zip = await createZip([...cut.map(({ take, shot }) => ({ name: takeFileName(take, shot), data: take.blob })), ...extras]);
+      downloadBlob(zip, `${slug(brief.concept)}-clips.zip`);
+    } catch {
+      setClipsError("Couldn’t pack the clips — try downloading them one by one.");
+    } finally {
+      setZipping(false);
     }
   };
+  const shareClips = async () => {
+    try {
+      await navigator.share({ files: clipFiles(), title: brief.concept });
+    } catch {
+      // The person closed the share sheet.
+    }
+  };
+  const canShareClips = cut.length > 0 && canShareFiles(clipFiles().slice(0, 1));
 
   const downloadScript = () => {
     const url = URL.createObjectURL(new Blob([scriptText(brief.concept, plan, hook)], { type: "text/plain" }));
@@ -487,9 +510,41 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
       </div>
       <span className={s.hint}>
         Prefer another AI video editor? “Copy as prompt” writes this version out — every cut, overlay, card and caption with
-        timings — to paste with your clips (“Raw takes” downloads them with the matching names).
+        timings — to paste with your clips (“Download all clips” packs them with the matching names).
       </span>
     </>
+  );
+
+  const clipsCard = (
+    <div className={s.createCard}>
+      <div className={s.stack} style={{ gap: 4 }}>
+        <span className={s.createTitle}>Just the clips</span>
+        <span className={s.hint}>
+          Every kept shot as you filmed it, numbered in story order — to edit anywhere, keep, or send to someone. The .zip also has
+          your script, captions (.srt) and the edit as a prompt.
+        </span>
+      </div>
+      <div className={s.actions}>
+        <Button size="md" variant="outline" icon="download" onClick={downloadAllClips} disabled={!cut.length || zipping}>
+          {zipping ? "Packing…" : `Download all clips (${cut.length})`}
+        </Button>
+        {canShareClips && <Button size="md" variant="outline" icon="share" onClick={shareClips}>Save to phone</Button>}
+      </div>
+      {clipsError && <p className={s.error} role="alert">{clipsError}</p>}
+      {cut.length > 0 && (
+        <ul className={s.clipList} aria-label="Clips">
+          {cut.map(({ take, shot }) => (
+            <li key={take.id}>
+              <span className={s.clipName}>{takeFileName(take, shot)}</span>
+              <span className={s.hint}>{take.seconds.toFixed(1)}s{take.origin === "ai" ? " · AI-made" : take.origin === "stock" ? " · Stock" : ""}</span>
+              <button type="button" className={s.panelClose} aria-label={`Download ${takeFileName(take, shot)}`} onClick={() => download(take.url, takeFileName(take, shot))}>
+                <Icon name="download" size={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 
   const postCaption = (
@@ -618,6 +673,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
             </div>
           )}
           {postCaption}
+          {clipsCard}
         </div>
 
         <div className={s.stack} style={{ gap: 28 }}>
@@ -642,9 +698,6 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
           </div>
 
           <div className={s.actions}>
-            <Button variant="ghost" size="sm" icon="download" onClick={downloadTakes} disabled={!cut.length}>
-              Raw takes ({cut.length})
-            </Button>
             <Button variant="ghost" size="sm" onClick={downloadScript}>Script</Button>
           </div>
         </div>
