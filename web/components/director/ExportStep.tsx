@@ -32,6 +32,9 @@ type Props = {
   kept: (Take | undefined)[];
   onGoToShot: (i: number) => void;
   finish: ExportState;
+  /** Called with the finished file, so it can be recorded in the creator's history. */
+  onExported?: (result: { blob: Blob; seconds: number; format: string }) => void;
+  onPostCaption?: (caption: string) => void;
 };
 
 function download(href: string, filename: string) {
@@ -52,7 +55,7 @@ type Render =
   | { state: "done"; url: string; blob: Blob; mime: string; seconds: number; format: FormatKey }
   | { state: "error"; message: string };
 
-export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Props) {
+export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExported, onPostCaption }: Props) {
   const checks = exportChecks(plan, brief, kept);
   const ready = checks.every((c) => c.ok);
   const cut = useMemo(() => kept.flatMap((t, i) => (t ? [{ take: t, shot: plan.shots[i] }] : [])), [kept, plan]);
@@ -70,6 +73,12 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
   const [captionState, setCaptionState] = useState<"idle" | "loading" | "error">("idle");
   const [captionError, setCaptionError] = useState("");
   const [copied, setCopied] = useState(false);
+  // Keep the saved video's caption in step with what's written here.
+  useEffect(() => {
+    if (!caption || !onPostCaption) return;
+    const id = setTimeout(() => onPostCaption(caption), 1000);
+    return () => clearTimeout(id);
+  }, [caption, onPostCaption]);
 
   // Free the finished video's memory when it's replaced or the page goes away.
   const doneUrl = render.state === "done" ? render.url : null;
@@ -258,6 +267,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
         signal: ctrl.signal,
       });
       setRender({ state: "done", url: URL.createObjectURL(result.blob), ...result, format });
+      onExported?.({ blob: result.blob, seconds: result.seconds, format });
     } catch (e) {
       setRender({ state: "error", message: e instanceof Error ? e.message : "Something went wrong while creating your video." });
     }

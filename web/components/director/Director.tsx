@@ -1,8 +1,14 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AccountButton, useAccount } from "@/components/app/account";
+import { api, thumbFromVideo } from "@/components/app/api";
 import { Button } from "@/components/ds/Button";
-import { applyHook, DEFAULT_BRIEF, type Brief, type Plan, type PlanResponse } from "@/lib/plan";
+import { applyHook, BriefSchema, DEFAULT_BRIEF, PlanSchema, type Brief, type Plan, type PlanResponse } from "@/lib/plan";
+import type { ProjectDetail, Video } from "@/lib/projectTypes";
+import { seriesContext } from "@/lib/series";
 import { clearProject, loadProject, saveProject } from "@/lib/storage";
 import type { Take } from "@/lib/takes";
 import { ConceptStep } from "./ConceptStep";
@@ -15,12 +21,31 @@ import { RecordStep } from "./RecordStep";
 import { ReviewStep } from "./ReviewStep";
 import { ShotsStep } from "./ShotsStep";
 import { useDirectorChat } from "./useDirectorChat";
+import a from "@/components/app/app.module.css";
 import s from "./director.module.css";
 
 const STEPS = ["Concept", "Plan", "Shots", "Record", "Review", "Export"] as const;
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
-export function Director() {
+type Props = {
+  /** Start a video in this project (optionally from one of its ideas). */
+  projectId?: string;
+  ideaId?: string;
+  /** Pick up a saved video. */
+  videoId?: string;
+};
+
+/** What's saved with a video so it can be picked up again: the plan plus the choices made on it. */
+type SavedPlan = { plan: Plan; hook: number; sample: boolean };
+
+export function Director({ projectId: startProject, ideaId: startIdea, videoId: startVideo }: Props = {}) {
+  const router = useRouter();
+  const account = useAccount();
+  const cloud = account.signedIn;
+  const [videoId, setVideoId] = useState<string | null>(startVideo ?? null);
+  const [project, setProject] = useState<{ id: string; name: string } | null>(null);
+  const [ideaTitle, setIdeaTitle] = useState("");
+  const [savedNote, setSavedNote] = useState("");
   const [step, setStep] = useState<Step>(1);
   const [brief, setBrief] = useState<Brief>(DEFAULT_BRIEF);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -36,25 +61,77 @@ export function Director() {
   const [restored, setRestored] = useState(false);
   const stepsRef = useRef<HTMLElement>(null);
 
-  // Restore the last project after mount (localStorage isn't available during SSR).
+  // Where this session starts: a saved video, a project's idea, or (signed out / single video) this browser's last draft.
+  const local = !startProject && !startVideo;
   useEffect(() => {
-    const saved = loadProject();
-    if (saved) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration from storage
-      setBrief(saved.brief);
-      setPlan(saved.plan);
-      setBasePlan(saved.plan);
-      setSample(saved.sample);
-      setHook(saved.hook);
-      setShot(saved.shot);
-      if (saved.plan) setStep(3);
-    }
-    setRestored(true);
-  }, []);
+    if (account.mode !== "off" && !account.ready) return;
+    let live = true;
+    const restorePlan = (raw: unknown) => {
+      const saved = raw as Partial<SavedPlan> | null;
+      const parsed = PlanSchema.safeParse(saved?.plan);
+      if (!parsed.success) return;
+      setPlan(parsed.data);
+      setBasePlan(parsed.data);
+      setHook(Math.min(2, Math.max(0, saved?.hook ?? 0)));
+      setSample(Boolean(saved?.sample));
+      setStep(3);
+    };
+    (async () => {
+      try {
+        if (startVideo && cloud) {
+          const { video } = await api<{ video: Video }>(`/api/videos/${startVideo}`);
+          if (!live) return;
+          const b = BriefSchema.safeParse(video.brief);
+          if (b.success) setBrief(b.data);
+          restorePlan(video.plan);
+          if (video.projectId) {
+            const d = await api<ProjectDetail>(`/api/projects/${video.projectId}`);
+            if (live) setProject({ id: d.project.id, name: d.project.name });
+          }
+        } else if (startProject && cloud) {
+          const d = await api<ProjectDetail>(`/api/projects/${startProject}`);
+          if (!live) return;
+          const idea = d.ideas.find((i) => i.id === startIdea);
+          setProject({ id: d.project.id, name: d.project.name });
+          setIdeaTitle(idea?.title ?? "");
+          setBrief({ ...DEFAULT_BRIEF, ...d.project.defaults, concept: idea?.concept ?? "", series: seriesContext(d.project, d.videos, idea?.title ?? "") });
+        } else if (local) {
+          const saved = loadProject();
+          if (saved) {
+            setBrief(saved.brief);
+            setPlan(saved.plan);
+            setBasePlan(saved.plan);
+            setSample(saved.sample);
+            setHook(saved.hook);
+            setShot(saved.shot);
+            if (saved.plan) setStep(3);
+          }
+        }
+      } catch (e) {
+        if (live) setError(e instanceof Error ? e.message : "Couldn’t open that video.");
+      } finally {
+        if (live) setRestored(true);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // Runs once sign-in state is known.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account.ready, account.mode]);
 
   useEffect(() => {
-    if (restored) saveProject({ brief, plan, sample, hook, shot });
-  }, [restored, brief, plan, sample, hook, shot]);
+    if (restored && local) saveProject({ brief, plan, sample, hook, shot });
+  }, [restored, local, brief, plan, sample, hook, shot]);
+
+  // Signed in: keep the saved video up to date as the plan changes (a moment after the last change).
+  useEffect(() => {
+    if (!cloud || !videoId || !plan) return;
+    const id = setTimeout(() => {
+      api(`/api/videos/${videoId}`, { method: "PATCH", body: { brief, plan: { plan, hook, sample } satisfies SavedPlan } }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [cloud, videoId, brief, plan, hook, sample]);
 
   // On phones the steps scroll sideways: keep the current one in view, and start each step at the top.
   useEffect(() => {
@@ -106,12 +183,48 @@ export function Director() {
       setHook(0);
       setShot(0);
       setStep(2);
+      // Signed in: this video is saved (to its project, if any) so it shows up in the studio and can be picked up later.
+      if (cloud && !videoId) {
+        const saved: SavedPlan = { plan: applyHook(data.plan, 0), hook: 0, sample: data.sample };
+        api<{ video: Video }>("/api/videos", {
+          body: { projectId: project?.id ?? null, ideaId: startIdea ?? null, title: (ideaTitle || next.concept).slice(0, 90), concept: next.concept.slice(0, 280), brief: next, plan: saved },
+        })
+          .then(({ video }) => {
+            setVideoId(video.id);
+            window.history.replaceState(null, "", `/studio?video=${video.id}`);
+          })
+          .catch(() => {});
+      }
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : "Couldn’t reach the Director. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [brief, takes, finish]);
+  }, [brief, takes, finish, cloud, videoId, project, startIdea, ideaTitle]);
+
+  /** The file was made: record it (with a thumbnail) in the creator's history. */
+  const onExported = useCallback(
+    async (result: { blob: Blob; seconds: number; format: string }) => {
+      if (!cloud || !videoId || !plan) return;
+      const thumb = await thumbFromVideo(result.blob);
+      try {
+        await api(`/api/videos/${videoId}`, {
+          method: "PATCH",
+          body: { status: "made", seconds: result.seconds, format: result.format, hook: plan.hooks[hook].line.replace(/^[“"]|[”"]$/g, ""), ...(thumb ? { thumb } : {}) },
+        });
+        setSavedNote(project ? `Saved to ${project.name}` : "Saved to your studio");
+      } catch {
+        setSavedNote("Made — but it couldn’t be saved to your history. Check your connection.");
+      }
+    },
+    [cloud, videoId, plan, hook, project],
+  );
+  const onPostCaption = useCallback(
+    (caption: string) => {
+      if (cloud && videoId) api(`/api/videos/${videoId}`, { method: "PATCH", body: { caption } }).catch(() => {});
+    },
+    [cloud, videoId],
+  );
 
   const pickHook = (i: number) => {
     setHook(i);
@@ -147,8 +260,22 @@ export function Director() {
 
   const reset = () => {
     if (takes.length && !window.confirm("Start a new video? Your recorded takes will be discarded.")) return;
+    if (project) {
+      router.push(`/projects/${project.id}`);
+      return;
+    }
+    if (!local) {
+      router.push("/studio");
+      return;
+    }
     takes.forEach((t) => URL.revokeObjectURL(t.url));
     clearProject();
+    // The next video is a new saved video, not more changes to this one.
+    if (videoId) {
+      setVideoId(null);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+    setSavedNote("");
     setTakes([]);
     setKept({});
     setPlan(null);
@@ -171,13 +298,18 @@ export function Director() {
     <div className={`${s.app} ${chat.open ? s.appWithPanel : ""}`}>
       <header className={s.header}>
         <div className={s.brand}>
-          <span className={s.wordmark}>ViralDirector</span>
-          {plan && (
+          <Link href="/" className={s.wordmark} style={{ color: "inherit", textDecoration: "none" }}>ViralDirector</Link>
+          {project ? (
+            <>
+              <span className={s.slash}>/</span>
+              <Link href={`/projects/${project.id}`} className={s.projectName} style={{ color: "inherit" }}>{project.name}</Link>
+            </>
+          ) : plan ? (
             <>
               <span className={s.slash}>/</span>
               <span className={s.projectName}>{brief.concept}</span>
             </>
-          )}
+          ) : null}
         </div>
         <nav className={s.steps} aria-label="Steps" ref={stepsRef}>
           {STEPS.map((label, i) => {
@@ -202,7 +334,12 @@ export function Director() {
           <Button variant={chat.open ? "secondary" : "outline"} size="sm" icon="message" onClick={() => chat.setOpen(!chat.open)} aria-expanded={chat.open} aria-label="Ask the Director">
             <span className={s.wideOnly}>Ask the Director</span>
           </Button>
-          {plan && <Button variant="ghost" size="sm" onClick={reset}>New<span className={s.wideOnly}>&nbsp;video</span></Button>}
+          {(plan || project) && (
+            <Button variant="ghost" size="sm" onClick={reset}>
+              {project ? <>Back<span className={s.wideOnly}>&nbsp;to project</span></> : <>New<span className={s.wideOnly}>&nbsp;video</span></>}
+            </Button>
+          )}
+          <AccountButton />
         </div>
       </header>
 
@@ -245,7 +382,26 @@ export function Director() {
           askBusy={chat.busy}
         />
       )}
-      {step === 6 && plan && <ExportStep plan={plan} brief={brief} hook={hook} kept={keptTakes} onGoToShot={(i) => { setShot(i); setStep(3); }} finish={finish} />}
+      {step === 6 && plan && (
+        <ExportStep
+          plan={plan}
+          brief={brief}
+          hook={hook}
+          kept={keptTakes}
+          onGoToShot={(i) => { setShot(i); setStep(3); }}
+          finish={finish}
+          onExported={onExported}
+          onPostCaption={onPostCaption}
+        />
+      )}
+
+      {savedNote && (
+        <div className={a.savedNote} role="status">
+          <span>{savedNote}</span>
+          {project ? <Link href={`/projects/${project.id}`}>View project</Link> : cloud ? <Link href="/">Your studio</Link> : null}
+          <button type="button" className={s.panelClose} style={{ color: "inherit" }} onClick={() => setSavedNote("")} aria-label="Dismiss">×</button>
+        </div>
+      )}
 
       <DirectorPanel
         open={chat.open}

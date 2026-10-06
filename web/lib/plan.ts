@@ -20,6 +20,8 @@ export const BriefSchema = z.object({
   format: z.enum(FORMATS),
   /** A story the creator approved in story mode (see lib/story.ts); empty for a one-sentence idea. */
   story: z.string().trim().max(STORY_MAX).default(""),
+  /** For a video in a project: the goal and what's been made, so the series builds instead of repeating. */
+  series: z.string().trim().max(1500).default(""),
 });
 export type Brief = z.infer<typeof BriefSchema>;
 
@@ -31,6 +33,7 @@ export const DEFAULT_BRIEF: Brief = {
   audience: "Teens 13–18",
   format: "Director picks",
   story: "",
+  series: "",
 };
 
 export const targetSeconds = (brief: Pick<Brief, "length">) => parseInt(brief.length, 10);

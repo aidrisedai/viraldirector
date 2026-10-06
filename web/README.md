@@ -5,6 +5,36 @@ through recording each shot on your webcam, checks every take, and hands you the
 
 Built from the Claude Design handoff (`../project/ViralDirector Web.dc.html`) on the EdAI design system.
 
+## Accounts and projects
+
+Signed out (or with sign-in not set up), the app is a single-video studio, exactly as before. Signed in, the home page is
+**your studio**: projects and your single videos.
+
+A **project** is a goal reached one video at a time — "one video a day for 90 days", "3 a week until launch":
+
+- **New project** (`/projects/new`): name, goal, how often (every day, 5/3/1 a week, twice a day), how long (30/60/90 days,
+  6 months, open-ended), start date, and the platform/audience/purpose/length every video in it defaults to. The Director
+  then writes the first ideas.
+- **Project page** (`/projects/[id]`): today's status ("Today's video is waiting", "On track", "2 behind"), a *Make
+  today's video* button, made vs. target with a progress bar, the day streak (daily projects) or how far ahead of plan
+  you are, posted count, days left, and a calendar of the whole run. **Up next** is the idea backlog: the Director
+  suggests more (optionally steered — "more behind-the-scenes"), you add, edit, reorder or skip your own. **Made** lists
+  every video with its thumbnail, date, length and hook; mark it posted (with the link), copy its caption, or reopen it.
+  Drafts you started but didn't finish appear under **In progress**.
+- **Making a video from an idea** opens the studio with the idea and the project's settings filled in, plus *series
+  context* (the goal and the recent videos) so the Director builds the series instead of repeating hooks. The video is
+  saved after planning (so it can be picked up on another device), and when it's exported it's recorded as made with a
+  thumbnail; its idea is used up. Single videos are saved the same way, outside any project.
+
+Stored per video: title, concept, hook, caption, length, format, a small JPEG thumbnail, the brief and plan, and status
+(draft / made / posted). **The video files themselves stay on the device that made them** — nothing is uploaded.
+
+Code: `lib/projectTypes.ts` (shapes and validation), `lib/projects.ts` (Postgres queries — every one scoped to the
+signed-in user), `lib/db.ts` (pool + automatic schema), `lib/projectStats.ts` (progress in the creator's time zone),
+`lib/projectIdeas.ts` + `lib/series.ts` (the Director's ideas and series context), `app/api/{projects,ideas,videos}`,
+`components/app/` (studio, project pages, account). Sign-in is Clerk (`proxy.ts`, `lib/auth.ts`, `lib/authConfig.ts`);
+the Content-Security-Policy is set per request in `proxy.ts` and allows only your Clerk domain (read from the key).
+
 ## Run locally
 
 ```bash
@@ -42,13 +72,20 @@ docker run -p 3000:3000 --env-file .env.local viraldirector
 3. **Variables:** add `ANTHROPIC_API_KEY` (and `ANTHROPIC_WORKSPACE_ID` if the key starts with `sk-ant-usr-`), and
    `OPENAI_API_KEY` for server-side captions.
    Railway injects `PORT`; don't set it.
-4. **Settings → Networking → Generate Domain** (HTTPS, which the camera needs). Optionally add a custom domain and
+4. **Accounts and projects (optional):**
+   - **Database:** in the Railway project, **+ New → Database → PostgreSQL**. Then in the app service's **Variables**, add
+     `DATABASE_URL` as a reference to the Postgres service's `DATABASE_URL`. Tables are created automatically.
+   - **Sign-in:** create an application at [clerk.com](https://clerk.com), choose the sign-in methods you want (email,
+     Google, …), and add its `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` to the app's Variables. For production, add
+     your domain in Clerk and use the live keys (`pk_live_…`, `sk_live_…`).
+   - `/api/health` then shows `"accounts":"clerk","database":"connected"`.
+5. **Settings → Networking → Generate Domain** (HTTPS, which the camera needs). Optionally add a custom domain and
    set `NEXT_PUBLIC_SITE_URL` to it.
-5. Keep **one replica**: the rate limiter is in memory, so it's exact with one instance and per-instance with more.
+6. Keep **one replica**: the rate limiter is in memory, so it's exact with one instance and per-instance with more.
 
 Every push to `main` redeploys; a deploy goes live only after `/api/health` responds.
 
-Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample","transcription":"server"|"device"}`.
+Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample","transcription":"server"|"device","accounts":"clerk"|"test"|"off","database":"connected"|"none"}`.
 
 ## Environment
 
@@ -60,6 +97,10 @@ Health check: `GET /api/health` → `{"ok":true,"director":"connected"|"sample",
 | `OPENAI_TRANSCRIBE_MODEL` | No | Defaults to `whisper-1` (needed for word timestamps). |
 | `TRANSCRIBE_RATE_LIMIT` | No | Transcriptions per IP per 10 minutes (default 60). |
 | `WRITER_RATE_LIMIT` | No | Writer questions, drafts and revisions per IP per 10 minutes (default 20). |
+| `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | For accounts | Clerk sign-in. Without them there's no sign-in and no projects. |
+| `DATABASE_URL` | For projects | Postgres for projects, ideas and saved videos. |
+| `DEV_AUTH` | Local only | `1` signs everyone in as one test user outside production. |
+| `IDEAS_RATE_LIMIT` | No | Idea suggestions per user per 10 minutes (default 12). |
 | `DIRECTOR_MODEL` | No | Defaults to `claude-opus-5-5`. |
 | `PLAN_RATE_LIMIT` | No | Plans per IP per 10 minutes (default 10). |
 | `EDIT_RATE_LIMIT` | No | Director edit plans per IP per 10 minutes (default 10). |

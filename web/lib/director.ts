@@ -26,7 +26,9 @@ Output rules:
 - Mark reaction shots and nice-to-have B-roll as required: false; everything that carries the story is required: true.
 - Use 5–9 shots. Write in plain, warm English for the stated audience. No emoji, no hashtags.
 
-When the brief includes a <story>: a writer wrote it from the creator's own account and the creator approved it. Build the plan from that story, not from scratch. Keep its order, its facts and its voice, and keep its lines word for word wherever they fit; tighten or cut only to hit the target length. Its [bracketed notes] are visual ideas: turn the good ones into b-roll, insert or screen shots. All three hooks must fit this story; one may be the story's own opening line.`;
+When the brief includes a <story>: a writer wrote it from the creator's own account and the creator approved it. Build the plan from that story, not from scratch. Keep its order, its facts and its voice, and keep its lines word for word wherever they fit; tighten or cut only to hit the target length. Its [bracketed notes] are visual ideas: turn the good ones into b-roll, insert or screen shots. All three hooks must fit this story; one may be the story's own opening line.
+
+When the brief includes a <series>: this video is one of a run toward the creator's goal. Fit it into the series — follow on from recent videos where it helps, never reuse their hooks or points, and if it's the first, set the series up. The CTA beat can point to the next video ("Part 2 tomorrow") when that fits the schedule.`;
 
 // Plain JSON schema for structured outputs. Length limits are enforced afterwards by PlanSchema.
 const str = { type: "string" } as const;
@@ -121,6 +123,7 @@ export function briefText(brief: Brief): string {
     `Format: ${brief.format === "Director picks" ? "your choice" : brief.format}`,
   ];
   if (brief.story) lines.push("", `<story>\n${brief.story}\n</story>`);
+  if (brief.series) lines.push("", `<series>\n${brief.series}\n</series>`);
   return lines.join("\n");
 }
 

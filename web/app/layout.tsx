@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Libre_Baskerville, Outfit } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import { AccountProvider } from "@/components/app/account";
+import { authMode, clerkPublishableKey } from "@/lib/authConfig";
 import "./globals.css";
 
 const baskerville = Libre_Baskerville({
@@ -35,10 +38,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+// Sign-in keys are read when the app runs, not when it's built.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const mode = authMode();
+  const body = <AccountProvider mode={mode}>{children}</AccountProvider>;
   return (
     <html lang="en" className={`${baskerville.variable} ${outfit.variable}`}>
-      <body>{children}</body>
+      <body>{mode === "clerk" ? <ClerkProvider publishableKey={clerkPublishableKey()}>{body}</ClerkProvider> : body}</body>
     </html>
   );
 }
