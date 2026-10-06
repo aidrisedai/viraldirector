@@ -143,6 +143,8 @@ export const TARGET_RMS = 0.25;
 
 /** Caption text for a kept take: the creator's edit, else what was said, else the script. */
 export function captionText(take: Take, shot: Shot, edited?: string): string {
+  // Footage brought in from elsewhere: only what was actually said (never the plan's line, which may be a guess).
+  if (take.origin === "import") return (edited?.trim() || take.transcript?.trim() || "").trim();
   if (!shot.line.trim() && !edited?.trim()) return "";
   return (edited?.trim() || take.transcript?.trim() || shot.line).trim();
 }

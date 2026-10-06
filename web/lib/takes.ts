@@ -18,8 +18,8 @@ export type Take = {
   /** Word-level timings from on-device speech recognition, relative to the clip; null until run. */
   words?: { word: string; start: number; end: number }[] | null;
   source: "camera" | "upload";
-  /** Where an uploaded clip came from, when it isn't the creator's own footage. */
-  origin?: "ai" | "stock";
+  /** Where an uploaded clip came from: AI-made, stock, or the creator's own footage brought in as a batch. */
+  origin?: "ai" | "stock" | "import";
   /** Credit for stock footage ("Video by … on Pexels"). */
   credit?: string;
 };

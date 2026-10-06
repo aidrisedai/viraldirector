@@ -101,7 +101,8 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
   const hookTitle = plan.hooks[hook].line.replace(/^[“"]|[”"]$/g, "");
   const signature = kept.map((t) => t?.id ?? "-").join(",");
   const planStale = !!finish.editPlan && finish.editPlan.signature !== signature;
-  const speaking = cut.flatMap(({ take, shot }) => (shot.line.trim() ? [{ take, shot, index: take.shot }] : []));
+  // Imported clips may have speech the plan doesn't know about, so they're always offered for captions.
+  const speaking = cut.flatMap(({ take, shot }) => (shot.line.trim() || take.origin === "import" ? [{ take, shot, index: take.shot }] : []));
 
   /** The timeline as it stands: exact transcripts and caption edits applied. */
   const currentTimeline = async (edits: Record<string, string> = finish.captionEdits) => {

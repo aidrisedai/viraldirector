@@ -145,6 +145,9 @@ describe("exact captions", () => {
     const t = take(2, { transcript: "bad idea teach you" });
     expect(captionText(t, SAMPLE_PLAN.shots[2], "Bad ideas teach you")).toBe("Bad ideas teach you");
     expect(captionText(t, SAMPLE_PLAN.shots[2])).toBe("bad idea teach you");
+    // Imported footage: only what was actually heard, never the plan's line.
+    expect(captionText({ ...t, origin: "import", transcript: null }, SAMPLE_PLAN.shots[2])).toBe("");
+    expect(captionText({ ...t, origin: "import", transcript: "we shipped it" }, { ...SAMPLE_PLAN.shots[3], line: "" })).toBe("we shipped it");
     expect(captionText(take(3), SAMPLE_PLAN.shots[3])).toBe("");
   });
 });

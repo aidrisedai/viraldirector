@@ -126,6 +126,7 @@
 .aiPanel { border: 1px dashed var(--vd-border, rgba(11, 11, 10, .2)); border-radius: 14px; padding: 14px 16px; }
 .aiPanel > summary { cursor: pointer; font-weight: 600; font-size: 15px; }
 .aiPanel[open] > summary { margin-bottom: 12px; }
+.clipPick { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .clipList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .clipList li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--vd-border, rgba(11, 11, 10, .08)); }
 .clipName { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

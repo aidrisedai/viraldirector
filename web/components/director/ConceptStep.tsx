@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { Button } from "@/components/ds/Button";
 import { Icon } from "@/components/ds/Icon";
 import { AUDIENCES, CONCEPT_MAX, FORMATS, GOALS, LENGTHS, LOOK_BLURB, LOOKS, PLATFORMS, SAMPLE_CONCEPT, type Brief } from "@/lib/plan";
@@ -11,15 +12,22 @@ type Props = {
   onChange: (patch: Partial<Brief>) => void;
   /** Plan the video; `patch` is applied to the brief first (the story, in story mode). */
   onNext: (patch: Partial<Brief>) => void;
+  /** Start from clips the creator already has. */
+  onFromClips: (files: File[], patch: Partial<Brief>) => void;
+  /** Progress while clips are read ("Looking at clip 2 of 6…"). */
+  clipStatus: string;
   loading: boolean;
   error: string;
 };
 
-export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) {
+export function ConceptStep({ brief, onChange, onNext, onFromClips, clipStatus, loading, error }: Props) {
+  const [fromClips, setFromClips] = useState(false);
+  const [clips, setClips] = useState<File[]>([]);
+  const clipInput = useRef<HTMLInputElement>(null);
   const dictation = useDictation(brief.concept, (concept) => onChange({ concept }), CONCEPT_MAX);
   const { goal, length, platform, audience, format } = brief;
   const writer = useStoryWriter({ goal, length, platform, audience, format });
-  const storyMode = writer.mode === "story";
+  const storyMode = writer.mode === "story" && !fromClips;
 
   const options = [
     { label: "Goal", key: "goal", values: GOALS },
@@ -28,10 +36,13 @@ export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) 
     { label: "Audience", key: "audience", values: AUDIENCES },
   ] as const;
 
-  const ready = storyMode ? storyReady(writer) && !writer.busy : brief.concept.trim().length >= 3;
+  const ready = fromClips
+    ? clips.length > 0 && brief.concept.trim().length >= 3
+    : storyMode ? storyReady(writer) && !writer.busy : brief.concept.trim().length >= 3;
   const submit = () => {
     if (!ready || loading) return;
-    if (storyMode && writer.story) onNext({ concept: writer.story.logline.trim(), story: writer.story.script.trim() });
+    if (fromClips) onFromClips(clips, { concept: brief.concept.trim() });
+    else if (storyMode && writer.story) onNext({ concept: writer.story.logline.trim(), story: writer.story.script.trim() });
     else onNext({ story: "" });
   };
 
@@ -48,21 +59,64 @@ export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) 
           <span className={s.eyebrow}>NEW VIDEO</span>
           <h1 className={s.conceptTitle}>What’s your video about?</h1>
           <div className={s.modeSwitch} role="group" aria-label="How do you want to start?">
-            <button type="button" aria-pressed={!storyMode} className={`${s.chip} ${!storyMode ? s.chipOn : ""}`} onClick={() => writer.patch({ mode: "idea" })}>
+            <button type="button" aria-pressed={!storyMode && !fromClips} className={`${s.chip} ${!storyMode && !fromClips ? s.chipOn : ""}`} onClick={() => { setFromClips(false); writer.patch({ mode: "idea" }); }}>
               Quick idea
             </button>
-            <button type="button" aria-pressed={storyMode} className={`${s.chip} ${storyMode ? s.chipOn : ""}`} onClick={() => writer.patch({ mode: "story" })}>
+            <button type="button" aria-pressed={storyMode} className={`${s.chip} ${storyMode ? s.chipOn : ""}`} onClick={() => { setFromClips(false); writer.patch({ mode: "story" }); }}>
               Tell the full story
+            </button>
+            <button type="button" aria-pressed={fromClips} className={`${s.chip} ${fromClips ? s.chipOn : ""}`} onClick={() => setFromClips(true)}>
+              I already have clips
             </button>
           </div>
           <p className={s.lede}>
-            {storyMode
+            {fromClips
+              ? "Pick the short clips you already filmed — an event, a class, a build session. The Director looks at each one, puts them in story order, and tells you if a shot is missing (often a hook to camera)."
+              : storyMode
               ? "Explain what happened in your own words and pick a writer. They’ll ask a few questions, write your story, and you approve it before the Director plans the shots."
               : "One sentence is enough. The Director writes the hook, script and shot list."}
           </p>
         </div>
 
-        {storyMode ? (
+        {fromClips && (
+          <div className={s.stack} style={{ gap: 12 }}>
+            <div className={s.ideaBox}>
+              <textarea
+                className={s.ideaInput}
+                aria-label="What’s it about?"
+                placeholder="What’s it about? e.g. Our first hackathon at the masjid"
+                rows={1}
+                maxLength={CONCEPT_MAX}
+                value={brief.concept}
+                onChange={(e) => onChange({ concept: e.target.value })}
+              />
+            </div>
+            <div className={s.clipPick}>
+              <Button variant="outline" size="md" icon="upload" onClick={() => clipInput.current?.click()} disabled={loading}>
+                {clips.length ? "Choose different clips" : "Choose clips"}
+              </Button>
+              <span className={s.hint}>
+                {clips.length
+                  ? `${clips.length} clip${clips.length === 1 ? "" : "s"}: ${clips.slice(0, 4).map((f) => f.name).join(", ")}${clips.length > 4 ? ` and ${clips.length - 4} more` : ""}`
+                  : "Up to 20 short videos. They stay on your device."}
+              </span>
+              <input
+                ref={clipInput}
+                type="file"
+                accept="video/*"
+                multiple
+                hidden
+                aria-label="Your clips"
+                onChange={(e) => {
+                  setClips(Array.from(e.target.files ?? []));
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {fromClips ? null : storyMode ? (
           <StoryWriter w={writer} brief={brief} />
         ) : (
           <div className={s.ideaBox}>
@@ -142,10 +196,14 @@ export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) 
           {error && <p className={s.error} role="alert">{error}</p>}
           {storyMode && !writer.story && <p className={s.hint}>Once your story is written and you’re happy with it, hand it to the Director.</p>}
           <Button type="submit" size="lg" iconRight={loading ? undefined : "arrow-right"} disabled={!ready || loading}>
-            {loading ? "Directing your video…" : storyMode ? "Give my story to the Director" : "Direct my video"}
+            {loading ? (fromClips ? "Building from your clips…" : "Directing your video…") : fromClips ? "Build my video from these clips" : storyMode ? "Give my story to the Director" : "Direct my video"}
           </Button>
         </div>
-        {loading && <p className={s.hint} aria-live="polite">The Director is writing hooks, a beat sheet and your shot list. This takes up to a minute.</p>}
+        {loading && (
+          <p className={s.hint} aria-live="polite">
+            {fromClips ? clipStatus || "Reading your clips…" : "The Director is writing hooks, a beat sheet and your shot list. This takes up to a minute."}
+          </p>
+        )}
       </form>
     </main>
   );

@@ -10,8 +10,11 @@ import { applyHook, BriefSchema, DEFAULT_BRIEF, PlanSchema, type Brief, type Pla
 import type { ProjectDetail, Video } from "@/lib/projectTypes";
 import { seriesContext } from "@/lib/series";
 import { clearProject, loadProject, saveProject } from "@/lib/storage";
+import type { Extra } from "@/lib/editPlan";
 import type { Take } from "@/lib/takes";
+import { analyzeClips, directClips, pickClips, type ImportedClip } from "./clips/importClips";
 import { ConceptStep } from "./ConceptStep";
+import { extraFromFile } from "./render/media";
 import { DirectorProvider } from "./DirectorContext";
 import { DirectorPanel } from "./DirectorPanel";
 import { useExportState } from "./export/useExportState";
@@ -57,6 +60,8 @@ export function Director({ projectId: startProject, ideaId: startIdea, videoId: 
   const [takes, setTakes] = useState<Take[]>([]);
   const [kept, setKept] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
+  /** While clips are being read: what's happening ("Looking at clip 2 of 6…"). */
+  const [clipStatus, setClipStatus] = useState("");
   const [error, setError] = useState("");
   const [restored, setRestored] = useState(false);
   const stepsRef = useRef<HTMLElement>(null);
@@ -160,6 +165,20 @@ export function Director({ projectId: startProject, ideaId: startIdea, videoId: 
   const { ask, setOpen: setPanelOpen } = chat;
   const directorActions = useMemo(() => ({ ask, open: () => setPanelOpen(true) }), [ask, setPanelOpen]);
 
+  /** Signed in: a new video is saved (to its project, if any) so it shows up in the studio and can be picked up later. */
+  const saveNewVideo = (next: Brief, plan: Plan, isSample: boolean) => {
+    if (!cloud || videoId) return;
+    const saved: SavedPlan = { plan: applyHook(plan, 0), hook: 0, sample: isSample };
+    api<{ video: Video }>("/api/videos", {
+      body: { projectId: project?.id ?? null, ideaId: startIdea ?? null, title: (ideaTitle || next.concept).slice(0, 90), concept: next.concept.slice(0, 280), brief: next, plan: saved },
+    })
+      .then(({ video }) => {
+        setVideoId(video.id);
+        window.history.replaceState(null, "", `/studio?video=${video.id}`);
+      })
+      .catch(() => {});
+  };
+
   const direct = useCallback(async (patch: Partial<Brief> = {}) => {
     const next = { ...brief, ...patch };
     setBrief(next);
@@ -183,24 +202,96 @@ export function Director({ projectId: startProject, ideaId: startIdea, videoId: 
       setHook(0);
       setShot(0);
       setStep(2);
-      // Signed in: this video is saved (to its project, if any) so it shows up in the studio and can be picked up later.
-      if (cloud && !videoId) {
-        const saved: SavedPlan = { plan: applyHook(data.plan, 0), hook: 0, sample: data.sample };
-        api<{ video: Video }>("/api/videos", {
-          body: { projectId: project?.id ?? null, ideaId: startIdea ?? null, title: (ideaTitle || next.concept).slice(0, 90), concept: next.concept.slice(0, 280), brief: next, plan: saved },
-        })
-          .then(({ video }) => {
-            setVideoId(video.id);
-            window.history.replaceState(null, "", `/studio?video=${video.id}`);
-          })
-          .catch(() => {});
-      }
+      saveNewVideo(next, data.plan, data.sample);
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : "Couldn’t reach the Director. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- saveNewVideo reads the same values
   }, [brief, takes, finish, cloud, videoId, project, startIdea, ideaTitle]);
+
+
+  /** Clips that didn't go under a shot become extra content the edit can still use. */
+  const keepAsExtras = async (left: ImportedClip[]) => {
+    const extras: Extra[] = [];
+    for (const c of left) {
+      URL.revokeObjectURL(c.take.url);
+      try {
+        extras.push({ ...(await extraFromFile(c.file)), note: c.info.transcript ? `Says: ${c.info.transcript.slice(0, 200)}` : "" });
+      } catch {}
+    }
+    if (extras.length) finish.setExtras((all) => [...all, ...extras].slice(0, 6));
+    return extras.length;
+  };
+
+  /** Starts a video from clips the creator already has: the Director plans around them. */
+  const directFromClips = async (files: File[], patch: Partial<Brief> = {}) => {
+    const next = { ...brief, ...patch, story: "" };
+    setBrief(next);
+    const picked = pickClips(files);
+    if (!picked.files.length) {
+      setError(picked.note || "Pick at least one video clip.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const clips = await analyzeClips(picked.files, setClipStatus);
+      if (!clips.length) throw new Error("This browser couldn’t play those clips. Try MP4 or MOV files.");
+      setClipStatus("The Director is putting your clips together…");
+      const data = await directClips({ mode: "plan", brief: next, clips: clips.map((c) => c.info) });
+      if (!data.plan) throw new Error("The Director didn’t return a plan. Try again.");
+      takes.forEach((t) => URL.revokeObjectURL(t.url));
+      finish.reset();
+      const used = clips.filter((c) => data.assign[c.info.id] !== undefined);
+      const filed = used.map((c) => ({ ...c.take, shot: data.assign[c.info.id] }));
+      setTakes(filed);
+      setKept(Object.fromEntries(filed.map((t) => [t.shot, t.id])));
+      const extra = await keepAsExtras(clips.filter((c) => data.assign[c.info.id] === undefined));
+      const plan = applyHook(data.plan, 0);
+      setPlan(plan);
+      setBasePlan(plan);
+      setSample(data.sample);
+      setHook(0);
+      setShot(Math.max(0, plan.shots.findIndex((_, i) => !filed.some((t) => t.shot === i))));
+      setStep(2);
+      setSavedNote([data.note, extra ? `${extra} clip${extra === 1 ? "" : "s"} kept as extra content for the edit.` : "", picked.note].filter(Boolean).join(" "));
+      saveNewVideo(next, data.plan, data.sample);
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "Couldn’t bring in your clips. Try again.");
+    } finally {
+      setLoading(false);
+      setClipStatus("");
+    }
+  };
+
+  /** Adds clips to an existing plan: each goes under the shot it fits; the rest become extra content. */
+  const importToShots = async (files: File[]): Promise<string> => {
+    if (!plan) return "";
+    const picked = pickClips(files);
+    if (!picked.files.length) return picked.note || "Pick at least one video clip.";
+    try {
+      const clips = await analyzeClips(picked.files, setClipStatus);
+      if (!clips.length) return "This browser couldn’t play those clips. Try MP4 or MOV files.";
+      setClipStatus("The Director is matching your clips to shots…");
+      const filled = plan.shots.flatMap((_, i) => (kept[i] ? [i] : []));
+      const data = await directClips({ mode: "match", brief, plan, filled, clips: clips.map((c) => c.info) });
+      const filed = clips.filter((c) => data.assign[c.info.id] !== undefined).map((c) => ({ ...c.take, shot: data.assign[c.info.id] }));
+      setTakes((all) => [...all, ...filed]);
+      setKept((k) => ({ ...k, ...Object.fromEntries(filed.map((t) => [t.shot, t.id])) }));
+      const extra = await keepAsExtras(clips.filter((c) => data.assign[c.info.id] === undefined));
+      const counts = [
+        `${filed.length} clip${filed.length === 1 ? "" : "s"} filed under ${filed.length === 1 ? "a shot" : "shots"}`,
+        extra && `${extra} kept as extra content for the edit`,
+      ].filter(Boolean).join(", ");
+      return [`${counts}.`, data.note, picked.note].filter(Boolean).join(" ");
+    } catch (e) {
+      return e instanceof Error ? e.message : "Couldn’t bring in your clips.";
+    } finally {
+      setClipStatus("");
+    }
+  };
 
   /** The file was made: record it (with a thumbnail) in the creator's history. */
   const onExported = useCallback(
@@ -348,6 +439,8 @@ export function Director({ projectId: startProject, ideaId: startIdea, videoId: 
           brief={brief}
           onChange={(patch) => setBrief((b) => ({ ...b, ...patch }))}
           onNext={direct}
+          onFromClips={directFromClips}
+          clipStatus={clipStatus}
           loading={loading}
           error={error}
         />
@@ -368,6 +461,8 @@ export function Director({ projectId: startProject, ideaId: startIdea, videoId: 
           onAskLine={chat.askLine}
           askBusy={chat.busy}
           brief={brief}
+          onImportClips={importToShots}
+          clipStatus={clipStatus}
         />
       )}
       {step === 4 && plan && <RecordStep plan={plan} shot={shot} onTake={addTake} onBack={() => setStep(3)} />}

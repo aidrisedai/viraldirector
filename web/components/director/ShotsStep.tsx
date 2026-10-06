@@ -22,11 +22,27 @@ type Props = {
   onAskLine: (shot: number) => void;
   askBusy: boolean;
   brief: Pick<Brief, "concept" | "audience" | "look">;
+  /** Files clips the creator already has under the shots they fit; resolves with what happened. */
+  onImportClips: (files: File[]) => Promise<string>;
+  clipStatus: string;
 };
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
-export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeconds, onRecord, onUpload, onAskLine, askBusy, brief }: Props) {
+export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeconds, onRecord, onUpload, onAskLine, askBusy, brief, onImportClips, clipStatus }: Props) {
+  const clipsRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState("");
+  const importClips = async (files: File[]) => {
+    if (!files.length) return;
+    setImporting(true);
+    setImportNote("");
+    try {
+      setImportNote(await onImportClips(files));
+    } finally {
+      setImporting(false);
+    }
+  };
   const detailRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const aiFileRef = useRef<HTMLInputElement>(null);
@@ -67,7 +83,7 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
         <div className={s.shotsHead}>
           <div className={s.stack} style={{ gap: 10 }}>
             <span className={s.eyebrow}>CALL SHEET</span>
-            <h1 className={s.h1}>{total} shots · about {recordingMinutes(plan)} minutes</h1>
+            <h1 className={s.h1}>{total} shots · {recorded === total ? "all filmed" : `about ${recordingMinutes(plan)} minutes`}</h1>
             <span style={{ fontSize: 16, color: "var(--vd-text-body)" }}>Grouped by where you’ll film, not story order.</span>
           </div>
           <div className={s.progress}>
@@ -77,6 +93,26 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
             </div>
             <div className={s.track}>
               <div className={s.fill} style={{ width: `${Math.round((recorded / total) * 100)}%` }} />
+            </div>
+            <div className={s.stack} style={{ gap: 6, marginTop: 6 }}>
+              <div>
+                <Button variant="outline" size="sm" icon="upload" onClick={() => clipsRef.current?.click()} disabled={importing}>
+                  {importing ? "Bringing in clips…" : "Add clips you already have"}
+                </Button>
+              </div>
+              <input
+                ref={clipsRef}
+                type="file"
+                accept="video/*"
+                multiple
+                hidden
+                aria-label="Clips you already have"
+                onChange={(e) => {
+                  importClips(Array.from(e.target.files ?? []));
+                  e.target.value = "";
+                }}
+              />
+              {(importing ? clipStatus : importNote) && <span className={s.hint} role="status">{importing ? clipStatus || "Reading your clips…" : importNote}</span>}
             </div>
           </div>
         </div>

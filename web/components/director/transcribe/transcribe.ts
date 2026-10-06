@@ -68,6 +68,16 @@ async function transcribeOnServer(take: Take, prompt: string): Promise<TakeTrans
   return data;
 }
 
+/** One clip on the server, or null when the server doesn't transcribe (no model download for a quick look). */
+export async function transcribeIfServer(take: Take): Promise<TakeTranscript | null> {
+  if (!(await serverTranscription())) return null;
+  try {
+    return await transcribeOnServer(take, "");
+  } catch {
+    return null;
+  }
+}
+
 let serverAvailable: boolean | null = null;
 
 /** Whether this deployment transcribes on the server (no model download for the creator). */

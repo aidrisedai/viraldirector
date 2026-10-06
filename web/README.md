@@ -224,6 +224,15 @@ Rendering is real time (a 45s video takes about 45s) and needs the tab to stay v
   is marked AI-made, the Director is told it's an illustration, and Export reminds the creator to turn on the
   platform's AI label. Neither is offered for shots of the creator, real people, reactions, results or screen
   recordings — those must be real.
+- **Clips you already have** (`lib/clipImport.ts`, `lib/clipDirector.ts`, `POST /api/clips`,
+  `components/director/clips/`): bring in up to 20 short videos at once. Each is read on the device — length, two
+  9:16 frames, whether there's speech, and what's said when server transcription is set up (that also becomes its
+  exact captions). On the Concept step, **I already have clips** has the Director plan a video around them: story
+  order, the strongest opening, and only the extra shots the story truly needs (often a hook to camera). On the shot
+  list, **Add clips you already have** files a batch under the shots they fit. Clips that fit nowhere become extra
+  content for the edit. Without the Director, built-in rules do the same: one shot per clip in the order picked, or
+  speaking clips matched to lines by their words and silent clips to silent shots in order. Imported clips are only
+  ever captioned with what was actually said, never with a planned line.
 - **Just the clips** (`lib/zip.ts`): ViralDirector builds videos from short planned shots rather than cutting clips out
   of one long recording, and the clips stay the creator's. Export always offers every kept shot, untouched and numbered
   in story order: one .zip (with the script, the captions as SRT and the edit as a prompt), "Save to phone" through the
