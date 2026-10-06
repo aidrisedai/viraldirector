@@ -17,7 +17,7 @@ export type AiEligibility = { ok: true } | { ok: false; reason: string };
 export function aiEligibility(shot: Shot): AiEligibility {
   if (!ILLUSTRATIVE_TYPES.has(shot.type)) return { ok: false, reason: "This shot is you on camera, so it has to be filmed for real." };
   const text = `${shot.title} ${shot.framing} ${shot.delivery}`;
-  if (PEOPLE.test(text)) return { ok: false, reason: "This shot shows real people or a real result, so film it for real — an AI version would be made up." };
+  if (PEOPLE.test(text)) return { ok: false, reason: "This shot shows real people or a real result, so film it for real — a stand-in clip would be made up." };
   return { ok: true };
 }
 

@@ -126,6 +126,20 @@
 .aiPanel { border: 1px dashed var(--vd-border, rgba(11, 11, 10, .2)); border-radius: 14px; padding: 14px 16px; }
 .aiPanel > summary { cursor: pointer; font-weight: 600; font-size: 15px; }
 .aiPanel[open] > summary { margin-bottom: 12px; }
+.promptBox {
+  font: inherit; font-size: 13.5px; line-height: 1.5; width: 100%; resize: vertical; padding: 10px 12px;
+  border-radius: 10px; border: 1px solid var(--vd-border, rgba(11, 11, 10, .15)); background: var(--vd-surface, #fff); color: inherit;
+}
+.stockForm { display: flex; gap: 8px; align-items: center; }
+.stockForm input { flex: 1; min-width: 0; }
+.stockGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.stockItem {
+  display: flex; flex-direction: column; gap: 4px; padding: 0; border: none; background: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: 11px; color: var(--vd-text-muted, #6b6b66); min-width: 0;
+}
+.stockItem img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; background: #e9e4da; }
+.stockItem span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stockItem:disabled { opacity: .6; cursor: progress; }
 .detail { composes: card; padding: 28px; display: flex; flex-direction: column; gap: 24px; position: sticky; top: 24px; }
 .specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; }
 .spec { display: flex; flex-direction: column; gap: 4px; font-size: 15px; line-height: 1.45; }

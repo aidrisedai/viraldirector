@@ -216,6 +216,14 @@ Rendering is real time (a 45s video takes about 45s) and needs the tab to stay v
   Panel, a pale flash into a warmer payoff with smaller captions (the Director marks where the payoff starts, or names
   the missing shot to record — it never fakes one), and a closing title with the call to action and a small EdAI logo
   instead of the end card. Every version also gets three alternative opening hooks.
+- **Can't film a shot?** (`ShotsStep.tsx`, `lib/aiPrompts.ts`, `lib/stock.ts`): silent B-roll and insert shots get
+  two ways to fill them. **Stock footage** — with `PEXELS_API_KEY` set, search Pexels (portrait clips, query prefilled
+  from the shot); the clip is fetched through `/api/stock/file` (Pexels hosts only) so it can be drawn into the video,
+  and the videographer is credited at Export. **Make it with AI** — a ready-to-paste text-to-video prompt built from
+  the shot and the edit style, ruling out faces, recognisable people, text, logos and fake results; the uploaded clip
+  is marked AI-made, the Director is told it's an illustration, and Export reminds the creator to turn on the
+  platform's AI label. Neither is offered for shots of the creator, real people, reactions, results or screen
+  recordings — those must be real.
 - **Captions (.srt)** (`lib/srt.ts`): downloads the captions timed to the finished video, in short phrases, for platforms
   that take a separate caption file.
 - **Look** (`export/LookControls.tsx`): caption style, size and position, transition, energy, the opening title

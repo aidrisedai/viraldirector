@@ -124,6 +124,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     kept[i]?.origin === "ai" ? `${x.title} (AI-made illustration)` : kept[i]?.origin === "stock" ? `${x.title} (stock footage)` : x.title,
   );
   const aiClips = cut.filter(({ take }) => take.origin === "ai").length;
+  const credits = [...new Set(cut.flatMap(({ take }) => (take.credit ? [take.credit] : [])))];
   const musicKind = finish.music === "No music" ? "none" : finish.music === "My music" ? "custom" : "generated";
 
   // The editor's timeline: rebuilt when takes, exact captions or caption edits change.
@@ -412,6 +413,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
       )}
       {render.state === "error" && <p className={s.error} role="alert">{render.message}</p>}
       {aiClips > 0 && <p className={s.hint} role="note"><strong>AI label:</strong> {AI_LABEL_NOTE}</p>}
+      {credits.length > 0 && <p className={s.hint} role="note"><strong>Stock credits</strong> (nice to add to your caption): {credits.join(" · ")}</p>}
       {mime && !mime.includes("mp4") && (
         <span className={s.hint}>This browser saves WebM. Instagram needs MP4 — create your video in Chrome, Edge or Safari for MP4.</span>
       )}

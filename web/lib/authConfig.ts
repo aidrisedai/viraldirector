@@ -33,7 +33,7 @@ export function contentSecurityPolicy(isDev: boolean, clerkHost: string | null):
     // Next's App Router injects inline bootstrap scripts; 'wasm-unsafe-eval' lets on-device speech recognition run.
     `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""}${clerk}`,
     "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' data: blob:${clerkHost ? " https://img.clerk.com" : ""}`,
+    `img-src 'self' data: blob: https://images.pexels.com${clerkHost ? " https://img.clerk.com" : ""}`,
     "media-src 'self' blob:",
     "font-src 'self'",
     `connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co${clerkHost ? ` https://${clerkHost}` : ""}${isDev ? " ws:" : ""}`,

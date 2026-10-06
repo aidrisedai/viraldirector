@@ -3,6 +3,7 @@ import { Button } from "@/components/ds/Button";
 import { aiEligibility, videoPrompt } from "@/lib/aiPrompts";
 import { recordingMinutes, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/plan";
 import type { Take } from "@/lib/takes";
+import { StockSearch } from "./StockSearch";
 import { Term } from "./Term";
 import { takeFromFile } from "./useRecorder";
 import s from "./director.module.css";
@@ -101,7 +102,7 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
                   <span className={`${s.shotMark} ${kept[i] ? s.shotMarkDone : ""}`} aria-label={kept[i] ? "Recorded" : undefined}>{i + 1}</span>
                   <span className={s.stack} style={{ gap: 2 }}>
                     <span className={s.shotTitle}>{x.title}</span>
-                    <span className={s.small}>{SHOT_TYPE_LABEL[x.type]} · {x.size} · {x.seconds}s{kept[i]?.origin === "ai" ? " · AI-made" : ""}</span>
+                    <span className={s.small}>{SHOT_TYPE_LABEL[x.type]} · {x.size} · {x.seconds}s{kept[i]?.origin === "ai" ? " · AI-made" : kept[i]?.origin === "stock" ? " · Stock" : ""}</span>
                   </span>
                   <span className={s.tiny}>{x.required ? "" : "Optional"}</span>
                 </button>
@@ -181,14 +182,17 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
             {uploadError && <p className={s.error} role="alert">{uploadError}</p>}
             {(cur.type === "b-roll" || cur.type === "insert") && (
               <details className={s.aiPanel} key={shot}>
-                <summary>Can’t film this? Make it with AI</summary>
+                <summary>Can’t film this? Use stock or AI</summary>
                 {ai.ok ? (
+                  <div className={s.stack} style={{ gap: 20 }}>
+                  <StockSearch key={shot} shot={shot} title={cur.title} onPick={onUpload} />
                   <div className={s.stack} style={{ gap: 12 }}>
+                    <span className={s.label}>Make it with AI</span>
                     <span className={s.hint}>
                       Paste this into a text-to-video tool (Sora, Veo, Runway, Kling and the like), download the clip, then upload it
                       here. It’s marked as AI-made so you remember to label it when you post.
                     </span>
-                    <textarea className={s.lineInput} readOnly rows={9} value={prompt} aria-label="AI video prompt" onFocus={(e) => e.currentTarget.select()} />
+                    <textarea className={s.promptBox} readOnly rows={9} value={prompt} aria-label="AI video prompt" onFocus={(e) => e.currentTarget.select()} />
                     <div className={s.actions}>
                       <Button variant="outline" size="sm" icon={copied ? "check" : undefined} onClick={copyPrompt}>{copied ? "Copied" : "Copy prompt"}</Button>
                       <Button variant="outline" size="sm" icon="upload" onClick={() => aiFileRef.current?.click()}>Upload the AI clip</Button>
@@ -203,6 +207,7 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
                         }}
                       />
                     </div>
+                  </div>
                   </div>
                 ) : (
                   <span className={s.hint}>{ai.reason}</span>
