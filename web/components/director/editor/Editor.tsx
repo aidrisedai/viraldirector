@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Icon } from "@/components/ds/Icon";
 import type { FormatKey, Segment } from "@/lib/edit";
-import { composeEdit, normalizePlan, type EditPlan, type Extra, type Style } from "@/lib/editPlan";
+import { clipBounds, composeEdit, normalizePlan, type EditPlan, type Extra, type Style } from "@/lib/editPlan";
 import {
-  addCallout, addCutaway, layout, moveCallout, moveCutaway, removeCallout, removeCutaway, roomAt, toggleDrop, toVideoTime,
-  updateCallout, updateCutaway,
+  addCallout, addCutaway, clipWindow, layout, moveCallout, moveCutaway, removeCallout, removeCutaway, resetTrim, roomAt, setTrim,
+  toggleDrop, toVideoTime, updateCallout, updateCutaway,
 } from "@/lib/timeline";
 import type { ExportState } from "../export/useExportState";
 import { buildScene } from "../render/compositor";
@@ -470,6 +470,67 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
     setSheet(name);
   };
 
+  // ---------- trimming clips ----------
+  // A slider drag is one undo step: the plan before the drag is pushed when it ends.
+  const trimBase = useRef<EditPlan | null>(null);
+  const trimLive = (segment: number, from: number, to: number, edge: "from" | "to") => {
+    if (!plan || !timeline || !lay) return;
+    trimBase.current ??= plan;
+    onPlan(setTrim(plan, timeline, segment, from, to));
+    // Show the frame at the edge being moved.
+    const start = lay.clips.find((c) => c.segment === segment)?.start ?? 0;
+    seek(edge === "from" ? start : start + Math.max(0, to - from - 0.05));
+  };
+  const trimDone = () => {
+    if (!trimBase.current) return;
+    past.current.push(trimBase.current);
+    future.current = [];
+    trimBase.current = null;
+    syncHistory();
+  };
+  const trimControls = (segment: number) => {
+    if (!plan || !timeline?.[segment]) return null;
+    const seg = timeline[segment];
+    const { max } = clipBounds(seg);
+    const w = clipWindow(plan, timeline, segment);
+    const trimmed = plan.trims.some((t) => t.segment === segment);
+    const nudge = (from: number, to: number) => commit(setTrim(plan, timeline, segment, from, to));
+    const row = (edge: "from" | "to", label: string) => (
+      <div className={e.trimRow}>
+        <span className={e.trimLabel}>{label}</span>
+        <button type="button" className={e.trimNudge} aria-label={`${label} 0.1 seconds earlier`} onClick={() => (edge === "from" ? nudge(w.from - 0.1, w.to) : nudge(w.from, w.to - 0.1))}>−</button>
+        <input
+          type="range"
+          min={0}
+          max={Math.round(max * 100) / 100}
+          step={0.05}
+          value={edge === "from" ? w.from : w.to}
+          aria-label={`Clip ${label.toLowerCase()}`}
+          onChange={(ev) => {
+            const v = Number(ev.target.value);
+            if (edge === "from") trimLive(segment, v, w.to, "from");
+            else trimLive(segment, w.from, v, "to");
+          }}
+          onPointerUp={trimDone}
+          onKeyUp={trimDone}
+          onBlur={trimDone}
+        />
+        <button type="button" className={e.trimNudge} aria-label={`${label} 0.1 seconds later`} onClick={() => (edge === "from" ? nudge(w.from + 0.1, w.to) : nudge(w.from, w.to + 0.1))}>+</button>
+        <span className={e.trimVal}>{(edge === "from" ? w.from : w.to).toFixed(1)}s</span>
+      </div>
+    );
+    return (
+      <div className={e.trim}>
+        <div className={e.trimHead}>
+          <span>Clip length <strong>{(w.to - w.from).toFixed(1)}s</strong> <span className={e.trimOf}>of {max.toFixed(1)}s recorded</span></span>
+          {trimmed && <button type="button" className={e.toolBtn} onClick={() => commit(resetTrim(plan, segment))}>Auto trim</button>}
+        </div>
+        {row("from", "Start")}
+        {row("to", "End")}
+      </div>
+    );
+  };
+
   // ---------- render ----------
   // Label spacing that never crowds: the smallest step at least 48 px apart.
   const ticks = useMemo(() => {
@@ -672,6 +733,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
             </>
           ) : selClip && sel?.kind === "clip" ? (
             <>
+              <button type="button" className={e.mTool} onClick={() => openSheet("clip")}><Icon name="scissors" size={20} />Trim</button>
               {selClip.speech && <button type="button" className={e.mTool} onClick={() => openSheet("clip")}><Icon name="message" size={20} />Captions</button>}
               <button type="button" className={`${e.mTool} ${e.mDanger}`} onClick={removeSelected}><Icon name="trash" size={20} />Remove clip</button>
               {dropped.length > 0 && (
@@ -761,15 +823,16 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                 {sheet === "text" && !selCallout && <p className={e.mSheetHint}>No room for text here — move the playhead onto a clip.</p>}
                 {sheet === "clip" && selClip && (
                   <div className={e.mForm}>
-                    <textarea
+                    {sel?.kind === "clip" && trimControls(sel.segment)}
+                    {selClip.speech && <textarea
                       className={e.mField}
                       aria-label="Captions for this clip"
-                      rows={4}
+                      rows={3}
                       defaultValue={selClip.words.map((w) => w.word).join(" ")}
                       key={selClip.take.id}
                       onBlur={(ev) => onCaption(selClip.take.id, ev.target.value)}
-                    />
-                    <p className={e.mSheetHint}>Fix any word — the timing stays matched to your voice.</p>
+                    />}
+                    {selClip.speech && <p className={e.mSheetHint}>Fix any word — the timing stays matched to your voice.</p>}
                   </div>
                 )}
                 {(sheet === "captions" || sheet === "style" || sheet === "music" || sheet === "director" || sheet === "export") && (
@@ -1034,7 +1097,8 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
             </>
           ) : selClip && sel?.kind === "clip" ? (
             <>
-              <span className={e.inspectorTitle}>{shotTitles[selClip.shot] ?? `Shot ${selClip.shot + 1}`} · {(selClip.to - selClip.from).toFixed(1)}s</span>
+              <span className={e.inspectorTitle}>{shotTitles[selClip.shot] ?? `Shot ${selClip.shot + 1}`}</span>
+              {sel?.kind === "clip" && trimControls(sel.segment)}
               {selClip.speech && (
                 <textarea
                   className={e.field}

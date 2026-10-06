@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Segment } from "./edit";
-import { normalizePlan, type EditPlan } from "./editPlan";
+import { applyTrims, composeEdit, normalizePlan, type EditPlan } from "./editPlan";
 import type { Take } from "./takes";
-import { addCallout, addCutaway, fromVideoTime, layout, moveCutaway, toggleDrop, toVideoTime } from "./timeline";
+import { addCallout, addCutaway, clipWindow, fromVideoTime, layout, moveCutaway, resetTrim, setTrim, toggleDrop, toVideoTime } from "./timeline";
 
 const take = (shot: number): Take => ({
   id: `t${shot}`, shot, url: "blob:x", blob: new Blob(), mime: "video/mp4", seconds: 8, peak: 0.5,
@@ -13,7 +13,7 @@ const seg = (shot: number, kind: Segment["kind"], from: number, to: number, spee
 });
 // hook 3s, a-roll 8s, b-roll 3s, a-roll 6s
 const timeline = [seg(0, "hook", 0.5, 3.5, true), seg(2, "a-roll", 1, 9, true), seg(3, "b-roll", 0, 3, false), seg(5, "a-roll", 0.4, 6.4, true)];
-const empty: EditPlan = { drop: [], captionFixes: [], cutaways: [], callouts: [], emphasis: [], endCta: "", summary: "" };
+const empty: EditPlan = { drop: [], trims: [], captionFixes: [], cutaways: [], callouts: [], emphasis: [], endCta: "", summary: "" };
 
 describe("layout", () => {
   it("lays kept clips end to end", () => {
@@ -64,5 +64,29 @@ describe("hand edits", () => {
     const extras = [{ id: "a", kind: "image" as const, seconds: null }, { id: "b", kind: "image" as const, seconds: null }];
     expect(normalizePlan(plan, timeline, extras).cutaways).toHaveLength(1);
     expect(normalizePlan(plan, timeline, extras, { strict: false }).cutaways).toHaveLength(2);
+  });
+});
+
+describe("trimming clips", () => {
+  const withWords = timeline.map((s, i) => (i === 1 ? { ...s, words: [{ word: "Bad", start: 1.5, end: 2 }, { word: "ideas", start: 7, end: 8 }] } : s));
+
+  it("sets a clip's in and out points inside the recorded take", () => {
+    const plan = setTrim(empty, withWords, 1, 2.5, 99);
+    expect(plan.trims).toEqual([{ segment: 1, from: 2.5, to: 9 }]); // as far as the clip goes
+    expect(clipWindow(plan, withWords, 1)).toEqual({ from: 2.5, to: 9 });
+    expect(clipWindow(empty, withWords, 1)).toEqual({ from: 1, to: 9 });
+    expect(setTrim(empty, withWords, 1, 5, 5.1).trims[0].to).toBeCloseTo(5.5, 6); // never shorter than half a second
+  });
+
+  it("changes the video's length and drops captions that were cut", () => {
+    const plan = setTrim(empty, withWords, 1, 2.5, 8);
+    expect(layout(withWords, plan).seconds).toBeCloseTo(20 - 8 + 5.5, 6);
+    const seq = composeEdit(withWords, plan).sequence;
+    expect(seq[1].words.map((w) => w.word)).toEqual(["ideas"]);
+    expect(applyTrims(withWords, plan.trims)[1].from).toBe(2.5);
+  });
+
+  it("goes back to the automatic trim", () => {
+    expect(resetTrim(setTrim(empty, withWords, 1, 2, 4), 1).trims).toEqual([]);
   });
 });

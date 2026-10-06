@@ -1,5 +1,5 @@
 import type { Segment } from "./edit";
-import { composeEdit, type Callout, type Cutaway, type EditPlan } from "./editPlan";
+import { clipBounds, composeEdit, MIN_CLIP, type Callout, type Cutaway, type EditPlan } from "./editPlan";
 
 // The editor's view of an edit: clips laid end to end in video time, and the pieces on top of them.
 // The plan stores overlays relative to a segment ("segment 2, 1.5 s in"); the editor works in video
@@ -99,4 +99,26 @@ export function removeCallout(plan: EditPlan, index: number): EditPlan {
 export function toggleDrop(plan: EditPlan, segment: number): EditPlan {
   const drop = plan.drop.includes(segment) ? plan.drop.filter((d) => d !== segment) : [...plan.drop, segment];
   return { ...plan, drop };
+}
+
+/** The clip's current in and out points (the creator's trim, else the automatic one). */
+export function clipWindow(plan: EditPlan, timeline: Segment[], segment: number): { from: number; to: number } {
+  const t = plan.trims.find((x) => x.segment === segment);
+  const seg = timeline[segment];
+  return t ? { from: t.from, to: t.to } : { from: seg.from, to: seg.to };
+}
+
+/** Sets a clip's in and out points, kept inside the recorded take and at least MIN_CLIP long. */
+export function setTrim(plan: EditPlan, timeline: Segment[], segment: number, from: number, to: number): EditPlan {
+  const seg = timeline[segment];
+  if (!seg) return plan;
+  const { max } = clipBounds(seg);
+  const f = Math.round(Math.min(Math.max(0, from), max - MIN_CLIP) * 100) / 100;
+  const t = Math.round(Math.min(max, Math.max(to, f + MIN_CLIP)) * 100) / 100;
+  return { ...plan, trims: [...plan.trims.filter((x) => x.segment !== segment), { segment, from: f, to: t }] };
+}
+
+/** Back to the automatic trim (dead air removed). */
+export function resetTrim(plan: EditPlan, segment: number): EditPlan {
+  return { ...plan, trims: plan.trims.filter((x) => x.segment !== segment) };
 }

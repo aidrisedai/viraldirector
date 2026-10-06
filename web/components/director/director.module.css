@@ -478,3 +478,10 @@ button.setting { cursor: pointer; }
   }
   .safeZone { display: none; }
 }
+.secondsRow { display: inline-flex; align-items: center; gap: 8px; }
+.secondsBtn {
+  width: 32px; height: 32px; border-radius: 16px; border: 1px solid var(--vd-chip-border); background: var(--white);
+  font-size: 18px; line-height: 1; cursor: pointer; color: var(--black);
+}
+.secondsBtn:disabled { opacity: .4; cursor: not-allowed; }
+.secondsVal { min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }

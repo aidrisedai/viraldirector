@@ -119,6 +119,9 @@ export function Director() {
     setBasePlan((p) => (p ? applyHook(p, i) : p));
   };
 
+  const editSeconds = (i: number, seconds: number) =>
+    setPlan((p) => (p ? { ...p, shots: p.shots.map((x, j) => (j === i ? { ...x, seconds } : x)) } : p));
+
   const editLine = (i: number, line: string) =>
     setPlan((p) => (p ? { ...p, shots: p.shots.map((x, j) => (j === i ? { ...x, line } : x)) } : p));
 
@@ -222,6 +225,7 @@ export function Director() {
           kept={keptTakes}
           onPickShot={setShot}
           onEditLine={editLine}
+          onEditSeconds={editSeconds}
           onRecord={() => setStep(4)}
           onUpload={addTake}
           onAskLine={chat.askLine}

@@ -45,6 +45,8 @@ const CalloutSchema = z.object({
 export const EditPlanSchema = z.object({
   /** Timeline segments (0-based) to leave out of the video. */
   drop: z.array(z.number().int().min(0)).max(12).default([]),
+  /** The creator's own in and out points for a clip, in seconds of the source take (replacing the automatic trim). */
+  trims: z.array(z.object({ segment: z.number().int().min(0), from: z.number().min(0), to: z.number().positive() })).max(12).default([]),
   /** Corrected caption text for a speaking segment (it replaces the transcript for that clip). */
   captionFixes: z.array(z.object({ segment: z.number().int().min(0), text: z.string().max(400) })).max(12).default([]),
   cutaways: z.array(CutawaySchema).max(16),
@@ -105,6 +107,38 @@ const segLength = (s: Segment) => s.to - s.from;
 const MIN_LEN = 0.8 - 1e-6;
 const NON_SPEECH_COVER = new Set(["b-roll", "insert", "screen"]);
 
+export type Trim = EditPlan["trims"][number];
+/** Shortest a clip can be trimmed to, in seconds. */
+export const MIN_CLIP = 0.5;
+
+/** How far a clip's in and out points can go: the whole recorded take. */
+export const clipBounds = (seg: Segment) => ({ min: 0, max: Math.max(seg.take.seconds || 0, seg.to) });
+
+/** Keeps trims that point at real clips and stay inside them. */
+function cleanTrims(trims: Trim[], timeline: Segment[]): Trim[] {
+  const out: Trim[] = [];
+  for (const t of trims) {
+    const seg = timeline[t.segment];
+    if (!seg || out.some((x) => x.segment === t.segment)) continue;
+    const { max } = clipBounds(seg);
+    const from = Math.min(Math.max(0, t.from), Math.max(0, max - MIN_CLIP));
+    const to = Math.min(max, Math.max(t.to, from + MIN_CLIP));
+    out.push({ segment: t.segment, from: ms(from), to: ms(to) });
+  }
+  return out;
+}
+
+/** The timeline with the creator's trims applied: new in/out points, captions limited to what's still in. */
+export function applyTrims(timeline: Segment[], trims: Trim[]): Segment[] {
+  if (!trims.length) return timeline;
+  return timeline.map((seg, i) => {
+    const t = trims.find((x) => x.segment === i);
+    if (!t) return seg;
+    const words = seg.words.filter((w) => (w.start + w.end) / 2 >= t.from && (w.start + w.end) / 2 <= t.to);
+    return { ...seg, from: t.from, to: t.to, words, speech: seg.speech && words.length > 0 };
+  });
+}
+
 /**
  * Clamps a plan (the Director's, the built-in one, or the creator's own) to what the footage can actually
  * support. `strict` (for generated plans) also keeps cutaways and callouts from overlapping; the creator's
@@ -112,10 +146,12 @@ const NON_SPEECH_COVER = new Set(["b-roll", "insert", "screen"]);
  */
 export function normalizePlan(
   plan: EditPlan,
-  timeline: Segment[],
+  raw: Segment[],
   extras: Pick<Extra, "id" | "kind" | "seconds">[],
   { strict = true }: { strict?: boolean } = {},
 ): EditPlan {
+  const trims = cleanTrims(plan.trims ?? [], raw);
+  const timeline = applyTrims(raw, trims);
   const extraById = new Map(extras.map((e) => [e.id, e]));
   const usedShots = new Set<number>();
   const busy = new Map<number, [number, number][]>(); // segment → covered windows
@@ -173,7 +209,7 @@ export function normalizePlan(
     .map((f) => ({ segment: f.segment, text: f.text.trim() }))
     .filter((f) => f.text && timeline[f.segment]?.speech);
 
-  return { drop, captionFixes, cutaways, callouts, emphasis, endCta: plan.endCta.trim() || DEFAULT_CTA, summary: plan.summary.trim() };
+  return { drop, trims, captionFixes, cutaways, callouts, emphasis, endCta: plan.endCta.trim() || DEFAULT_CTA, summary: plan.summary.trim() };
 }
 
 /**
@@ -213,6 +249,7 @@ export function fallbackPlan(timeline: Segment[], extras: Pick<Extra, "id" | "ki
   ].filter(Boolean);
   return {
     drop: [],
+    trims: [],
     captionFixes: [],
     cutaways,
     callouts: [],
@@ -236,7 +273,8 @@ export type ComposedSegment = Segment & {
 export type ComposedEdit = { sequence: ComposedSegment[]; endCta: string };
 
 /** Applies a (normalised) plan: B-roll used as cutaways leaves the sequence; overlays attach to segments. */
-export function composeEdit(timeline: Segment[], plan: EditPlan): ComposedEdit {
+export function composeEdit(raw: Segment[], plan: EditPlan): ComposedEdit {
+  const timeline = applyTrims(raw, plan.trims ?? []);
   const usedShots = new Set(plan.cutaways.filter((c) => c.source.startsWith("shot:")).map((c) => Number(c.source.slice(5))));
   const sequence: ComposedSegment[] = [];
   const dropped = new Set(plan.drop);

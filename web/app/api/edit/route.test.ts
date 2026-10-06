@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { DEFAULT_STYLE, type EditPlan, type EditRequest, type Style } from "@/lib/editPlan";
 
 // A plain stub rather than vi.fn(): Vitest fails a test whose vi.fn() mock rejects.
-const PLAN: EditPlan = { drop: [], captionFixes: [], cutaways: [], callouts: [], emphasis: [], endCta: "Follow for more", summary: "Done." };
+const PLAN: EditPlan = { drop: [], trims: [], captionFixes: [], cutaways: [], callouts: [], emphasis: [], endCta: "Follow for more", summary: "Done." };
 const RESULT: { plan: EditPlan; style: Style } = { plan: PLAN, style: { ...DEFAULT_STYLE, captions: "Bold" } };
 let calls: unknown[] = [];
 let planEdit: () => Promise<{ plan: EditPlan; style: Style }> = async () => RESULT;

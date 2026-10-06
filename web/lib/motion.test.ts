@@ -54,7 +54,7 @@ describe("music mix", () => {
 
 describe("reviseLocally", () => {
   const plan: EditPlan = {
-    drop: [], captionFixes: [], cutaways: [], emphasis: [], endCta: "", summary: "",
+    drop: [], trims: [], captionFixes: [], cutaways: [], emphasis: [], endCta: "", summary: "",
     callouts: [
       { segment: 0, at: 1, seconds: 2, text: "4th idea", style: "stat" },
       { segment: 1, at: 1, seconds: 2, text: "The point", style: "label" },

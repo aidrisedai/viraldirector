@@ -5,7 +5,7 @@ import { Icon } from "@/components/ds/Icon";
 import type { ChatRequest, ChatResponse } from "@/lib/chat";
 import { buildTimeline, FORMATS, type FormatKey, type Segment, type SpeechAnalysis } from "@/lib/edit";
 import {
-  composeEdit, EXTRAS_MAX, fallbackPlan, normalizePlan, timelineForDirector,
+  applyTrims, composeEdit, EXTRAS_MAX, fallbackPlan, normalizePlan, timelineForDirector,
   type EditPlan, type EditRequest, type EditResponse, type Extra, type Style,
 } from "@/lib/editPlan";
 import { reviseLocally } from "@/lib/revise";
@@ -138,7 +138,8 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
   /** Sends the timeline (and, for a revision, the current edit and feedback) to the Director. */
   const requestEdit = async (timeline: Segment[], feedback: string, current: EditPlan | null): Promise<{ data: EditResponse; status: number }> => {
     const body: EditRequest = {
-      timeline: timelineForDirector(timeline, plan.shots.map((x) => x.title), current),
+      // The Director sees clips as the creator trimmed them.
+      timeline: timelineForDirector(applyTrims(timeline, current?.trims ?? []), plan.shots.map((x) => x.title), current && { ...current, trims: [] }),
       extras: await Promise.all(
         finish.extras.map(async (e) => ({ id: e.id, kind: e.kind, seconds: e.seconds, note: e.note, thumb: await extraThumb(e) })),
       ),
@@ -210,7 +211,8 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
       source = finish.editPlan && !planStale ? finish.editPlan.source : "builtin";
       if (status !== 503) note = `${data.error} Made the changes the built-in editor understands.`;
     } else {
-      next = normalizePlan(data.plan, timeline, finish.extras);
+      // Trims are the creator's call; the Director's revision keeps them.
+      next = normalizePlan({ ...data.plan, trims: current.trims }, timeline, finish.extras);
       style = data.style;
       summary = next.summary || "Updated the edit.";
       source = "director";

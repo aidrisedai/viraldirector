@@ -12,6 +12,8 @@ type Props = {
   kept: (Take | undefined)[];
   onPickShot: (i: number) => void;
   onEditLine: (i: number, line: string) => void;
+  /** Changes how long a shot should be (recording stops automatically at this length). */
+  onEditSeconds: (i: number, seconds: number) => void;
   onRecord: () => void;
   onUpload: (take: Take) => void;
   onAskLine: (shot: number) => void;
@@ -20,7 +22,7 @@ type Props = {
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
-export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, onUpload, onAskLine, askBusy }: Props) {
+export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeconds, onRecord, onUpload, onAskLine, askBusy }: Props) {
   const detailRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -104,7 +106,22 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, 
               <div className={s.spec}><span className={s.small}><Term word="Framing" /></span><span>{cur.framing}</span></div>
               <div className={s.spec}><span className={s.small}><Term word="Lighting" /></span><span>{cur.lighting}</span></div>
               <div className={s.spec}><span className={s.small}><Term word="Delivery" /></span><span>{cur.delivery}</span></div>
-              <div className={s.spec}><span className={s.small}>Duration</span><span>{cur.seconds}s</span></div>
+              <div className={s.spec}>
+                <span className={s.small}>Duration</span>
+                <span className={s.secondsRow}>
+                  <button type="button" className={s.secondsBtn} onClick={() => onEditSeconds(shot, Math.max(1, cur.seconds - 1))} disabled={cur.seconds <= 1} aria-label="One second shorter">−</button>
+                  <span className={s.secondsVal} aria-live="polite">{cur.seconds}s</span>
+                  <button type="button" className={s.secondsBtn} onClick={() => onEditSeconds(shot, Math.min(30, cur.seconds + 1))} disabled={cur.seconds >= 30} aria-label="One second longer">+</button>
+                </span>
+                {(() => {
+                  // People say about 2.6 words a second on short-form video.
+                  const words = cur.line.trim() ? cur.line.trim().split(/\s+/).length : 0;
+                  const needs = Math.ceil(words / 2.6);
+                  return words > 0 && needs > cur.seconds ? (
+                    <span className={s.tiny} style={{ color: "var(--status-warning-fg)" }}>The line needs about {needs}s to say</span>
+                  ) : null;
+                })()}
+              </div>
             </div>
             <div className={s.lineBlock}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
