@@ -29,3 +29,25 @@ describe("plan", () => {
     expect(plan.beats[1]).toEqual(SAMPLE_PLAN.beats[1]);
   });
 });
+
+describe("lenient plan parsing", () => {
+  it("keeps a plan whose labels run long, trimming them to fit", () => {
+    const long = {
+      ...SAMPLE_PLAN,
+      beats: SAMPLE_PLAN.beats.map((b, i) => (i === 2 ? { ...b, label: "Value beat 1: why bad ideas teach you" } : b)),
+      shots: SAMPLE_PLAN.shots.map((x, i) => (i === 0 ? { ...x, seconds: 45, title: "x".repeat(80) } : x)),
+    };
+    const parsed = PlanSchema.safeParse(long);
+    expect(parsed.success).toBe(true);
+    const plan = parsed.data!;
+    expect(plan.beats[2].label.length).toBeLessThanOrEqual(24);
+    expect(plan.beats[2].label).toBe("Value beat 1: why bad…");
+    expect(plan.shots[0].seconds).toBe(30);
+    expect(plan.shots[0].title.length).toBeLessThanOrEqual(60);
+  });
+
+  it("still rejects plans missing what matters", () => {
+    expect(PlanSchema.safeParse({ ...SAMPLE_PLAN, hooks: SAMPLE_PLAN.hooks.slice(0, 2) }).success).toBe(false);
+    expect(PlanSchema.safeParse({ ...SAMPLE_PLAN, beats: [{ label: "", line: "x", seconds: 3 }] }).success).toBe(false);
+  });
+});

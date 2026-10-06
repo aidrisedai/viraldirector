@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AUDIENCES, CONCEPT_MAX, FORMATS, GOALS, LENGTHS, PLATFORMS, STORY_MAX } from "./plan";
+import { AUDIENCES, CONCEPT_MAX, fitText, FORMATS, GOALS, LENGTHS, PLATFORMS, STORY_MAX } from "./plan";
 
 // Story mode: the creator explains the whole scenario, a writer turns it into a story, and the
 // approved story goes to the Director instead of a one-sentence idea.
@@ -22,13 +22,13 @@ export const QUESTIONS_MAX = 3;
 export const NOTE_MAX = 600;
 
 export const StorySchema = z.object({
-  title: z.string().trim().min(1).max(80),
+  title: fitText(80),
   /** One sentence; becomes the brief's concept. */
-  logline: z.string().trim().min(3).max(CONCEPT_MAX),
+  logline: fitText(CONCEPT_MAX, 3),
   /** What the creator says, in order, with short [visual notes] in square brackets. */
   script: z.string().trim().min(1).max(SCRIPT_MAX),
   /** The writer's note to the creator about the choices made. */
-  note: z.string().max(NOTE_MAX),
+  note: fitText(NOTE_MAX, 0),
 });
 export type Story = z.infer<typeof StorySchema>;
 

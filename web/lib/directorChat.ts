@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { ChatRequest, DirectorReply } from "./chat";
 import { callDirector, DirectorError, responseText } from "./director";
-import { beatRanges, SHOT_TYPE_LABEL, targetSeconds } from "./plan";
+import { beatRanges, fitText, SHOT_TYPE_LABEL, targetSeconds } from "./plan";
 
 const SYSTEM = `You are the Director in ViralDirector, coaching a solo creator — often a teenager — through planning and filming one short vertical video. You speak like a warm, direct film director on set.
 
@@ -21,8 +21,8 @@ Modes (given in <context>):
   Comment on framing, lighting, eye contact, expression, energy and background. Never comment on the creator's body, looks or clothing, except to say something in frame is distracting.`;
 
 const ReplySchema = z.object({
-  reply: z.string().min(1).max(3000),
-  suggestedLine: z.string().max(400),
+  reply: fitText(3000),
+  suggestedLine: fitText(400, 0),
   verdict: z.enum(["keep", "retake", "none"]),
 });
 

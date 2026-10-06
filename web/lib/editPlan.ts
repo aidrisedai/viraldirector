@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Segment, TimedWord } from "./edit";
+import { fitText } from "./plan";
 
 // ---------- Extra content the creator adds ----------
 
@@ -37,7 +38,7 @@ const CalloutSchema = z.object({
   segment: z.number().int().min(0),
   at: z.number().min(0),
   seconds: z.number().positive(),
-  text: z.string().min(1).max(48),
+  text: fitText(48),
   /** stat: a big number or fact; label: a short tag or heading. */
   style: z.enum(["stat", "label"]),
 });
@@ -48,15 +49,15 @@ export const EditPlanSchema = z.object({
   /** The creator's own in and out points for a clip, in seconds of the source take (replacing the automatic trim). */
   trims: z.array(z.object({ segment: z.number().int().min(0), from: z.number().min(0), to: z.number().positive() })).max(12).default([]),
   /** Corrected caption text for a speaking segment (it replaces the transcript for that clip). */
-  captionFixes: z.array(z.object({ segment: z.number().int().min(0), text: z.string().max(400) })).max(12).default([]),
-  cutaways: z.array(CutawaySchema).max(16),
-  callouts: z.array(CalloutSchema).max(10),
+  captionFixes: z.array(z.object({ segment: z.number().int().min(0), text: fitText(400, 0) })).transform((x) => x.slice(0, 12)).default([]),
+  cutaways: z.array(CutawaySchema).transform((x) => x.slice(0, 16)),
+  callouts: z.array(CalloutSchema).transform((x) => x.slice(0, 10)),
   /** Words to emphasise in the captions, per segment. */
-  emphasis: z.array(z.object({ segment: z.number().int().min(0), word: z.string().min(1).max(40) })).max(20),
+  emphasis: z.array(z.object({ segment: z.number().int().min(0), word: fitText(40) })).transform((x) => x.slice(0, 20)),
   /** Call to action on the end card. */
-  endCta: z.string().max(60),
+  endCta: fitText(60, 0),
   /** One or two sentences on what the Director did, shown to the creator. */
-  summary: z.string().max(500),
+  summary: fitText(500, 0),
 });
 export type EditPlan = z.infer<typeof EditPlanSchema>;
 export type Cutaway = z.infer<typeof CutawaySchema>;

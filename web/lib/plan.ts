@@ -52,35 +52,49 @@ export const SHOT_TYPE_LABEL: Record<ShotType, string> = {
   screen: "Screen recording",
 };
 
+/**
+ * The Director's writing occasionally runs a little long ("Value beat 2: the proof"). Rather than throw away a good
+ * plan, text is trimmed to fit (at a word boundary, with an ellipsis) and numbers are brought into range.
+ */
+export function fit(text: string, max: number): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.5 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+export const fitText = (max: number, min = 1) => z.string().transform((v) => fit(v, max)).pipe(z.string().min(min).max(max));
+export const whole = (min: number, max: number) => z.number().transform((n) => Math.min(max, Math.max(min, Math.round(n))));
+
 const HookSchema = z.object({
-  kind: z.string().min(1).max(40),
-  line: z.string().min(1).max(200),
-  why: z.string().min(1).max(240),
+  kind: fitText(40),
+  line: fitText(200),
+  why: fitText(240),
 });
 
 const BeatSchema = z.object({
-  label: z.string().min(1).max(24),
-  line: z.string().min(1).max(400),
-  seconds: z.number().int().min(1).max(60),
+  label: fitText(24),
+  line: fitText(400),
+  seconds: whole(1, 60),
 });
 
 const ShotSchema = z.object({
-  location: z.string().min(1).max(40),
-  title: z.string().min(1).max(60),
+  location: fitText(40),
+  title: fitText(60),
   type: z.enum(SHOT_TYPES),
-  size: z.string().min(1).max(30),
-  framing: z.string().min(1).max(200),
-  lighting: z.string().min(1).max(200),
-  delivery: z.string().min(1).max(200),
-  line: z.string().max(400),
-  seconds: z.number().int().min(1).max(30),
+  size: fitText(30),
+  framing: fitText(200),
+  lighting: fitText(200),
+  delivery: fitText(200),
+  line: fitText(400, 0),
+  seconds: whole(1, 30),
   required: z.boolean(),
 });
 
 export const PlanSchema = z.object({
-  hooks: z.array(HookSchema).length(3),
-  beats: z.array(BeatSchema).min(3).max(8),
-  shots: z.array(ShotSchema).min(3).max(12),
+  hooks: z.array(HookSchema).min(3).transform((h) => h.slice(0, 3)),
+  beats: z.array(BeatSchema).min(3).transform((b) => b.slice(0, 8)),
+  shots: z.array(ShotSchema).min(3).transform((x) => x.slice(0, 12)),
 });
 
 export type Hook = z.infer<typeof HookSchema>;
