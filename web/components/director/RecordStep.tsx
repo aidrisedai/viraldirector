@@ -47,9 +47,9 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
   ];
 
   return (
-    <main data-screen-label="04 Record" className={s.record}>
-      <div className={s.stack} style={{ gap: 20 }}>
-        <div className={s.stack} style={{ gap: 8 }}>
+    <main data-screen-label="04 Record" className={s.record} data-phase={phase}>
+      <div className={`${s.stack} ${s.recInfo}`} style={{ gap: 20 }}>
+        <div className={`${s.stack} ${s.recTitle}`} style={{ gap: 8 }}>
           <span className={s.eyebrowDark}>SHOT {shot + 1} OF {plan.shots.length} · {SHOT_TYPE_LABEL[cur.type].toUpperCase()}</span>
           <h2 className={s.h2}>{cur.title}</h2>
         </div>
@@ -62,7 +62,7 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
           ))}
         </div>
         {upNext.length > 0 && (
-          <div className={s.stack} style={{ gap: 6 }}>
+          <div className={`${s.stack} ${s.recUpNext}`} style={{ gap: 6 }}>
             <span className={s.darkMuted}>Up next</span>
             {upNext.map((x) => (
               <div key={x.n} className={s.upNext}>
@@ -72,12 +72,14 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
             ))}
           </div>
         )}
-        <div>
-          <Button variant="outline" tone="dark" size="sm" onClick={onBack} disabled={recording}>Back to shot list</Button>
+        <div className={s.recBack}>
+          <Button variant="outline" tone="dark" size="sm" onClick={onBack} disabled={recording}>
+            <span className={s.wideOnly}>Back to shot list</span><span className={s.narrowOnly}>Shots</span>
+          </Button>
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center" }}>
+      <div className={s.cameraWrap}>
         <div className={s.camera}>
           <video ref={videoRef} className={s.cameraFeed} autoPlay muted playsInline />
           {phase !== "ready" && phase !== "recording" && phase !== "countdown" && (
@@ -106,8 +108,8 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
         </div>
       </div>
 
-      <div className={s.stack} style={{ gap: 20 }}>
-        <span className={s.darkMuted}>Teleprompter</span>
+      <div className={`${s.stack} ${s.recControls}`} style={{ gap: 20 }}>
+        <span className={`${s.darkMuted} ${s.wideOnly}`}>Teleprompter</span>
         <div className={s.prompter}>
           {cur.line ? (
             <>
@@ -127,6 +129,7 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
           >
             <span className={phase === "ready" ? s.recStart : s.recStop} />
           </button>
+          <span className={s.recClock}>{clock(elapsed)} / {clock(total)}</span>
           <span className={s.stopHint}>
             {phase === "ready" ? (
               <>Starts after a 3-second countdown.<br />Press space to start.</>

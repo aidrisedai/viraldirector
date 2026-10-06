@@ -18,8 +18,19 @@ const CAPTION_HINT: Record<Style["captions"], string> = {
 
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
 
+export type LookSection = "captions" | "motion" | "title" | "music" | "brand";
+
+type Props = {
+  state: ExportState;
+  hookTitle: string;
+  disabled: boolean;
+  /** Show only these sections (the phone editor puts each in its own sheet). */
+  only?: LookSection[];
+};
+
 /** The look of the video: captions, motion, opening title, music and branding. */
-export function LookControls({ state, hookTitle, disabled }: { state: ExportState; hookTitle: string; disabled: boolean }) {
+export function LookControls({ state, hookTitle, disabled, only }: Props) {
+  const show = (section: LookSection) => !only || only.includes(section);
   const { style, setStyle, music, setMusic, customMusic, setCustomMusic } = state;
   const set = (p: Partial<Style>) => setStyle((x) => ({ ...x, ...p }));
   const fileRef = useRef<HTMLInputElement>(null);
@@ -42,6 +53,7 @@ export function LookControls({ state, hookTitle, disabled }: { state: ExportStat
 
   return (
     <fieldset className={s.look} disabled={disabled}>
+      {show("captions") && (
       <div className={s.stack} style={{ gap: 8 }}>
         <span className={s.label}>Captions</span>
         <Chips label="Caption style" options={CAPTION_STYLES} isOn={(c) => c === style.captions} onToggle={(captions) => set({ captions })} />
@@ -53,7 +65,9 @@ export function LookControls({ state, hookTitle, disabled }: { state: ExportStat
           </div>
         )}
       </div>
+      )}
 
+      {show("motion") && (
       <div className={s.stack} style={{ gap: 8 }}>
         <span className={s.label}>Motion</span>
         <div className={s.lookRow}>
@@ -61,13 +75,15 @@ export function LookControls({ state, hookTitle, disabled }: { state: ExportStat
           <Chips label="Energy" options={ENERGIES} isOn={(c) => c === style.energy} onToggle={(energy) => set({ energy })} />
         </div>
       </div>
+      )}
 
+      {show("title") && (
       <div className={s.stack} style={{ gap: 8 }}>
         <span className={s.label}>Opening title</span>
         <div className={s.lookRow}>
           <input
             className={s.extraNote}
-            style={{ flex: 1, minWidth: 200 }}
+            style={{ flex: 1, minWidth: "min(100%, 200px)" }}
             aria-label="Opening title"
             placeholder={hookTitle}
             maxLength={90}
@@ -78,7 +94,9 @@ export function LookControls({ state, hookTitle, disabled }: { state: ExportStat
           <Chips label="Show opening title" options={["Show", "Hide"] as const} isOn={(c) => (c === "Show") === style.showTitle} onToggle={(c) => set({ showTitle: c === "Show" })} />
         </div>
       </div>
+      )}
 
+      {show("music") && (
       <div className={s.stack} style={{ gap: 8 }}>
         <span className={s.label}>Music</span>
         <Chips
@@ -132,11 +150,14 @@ export function LookControls({ state, hookTitle, disabled }: { state: ExportStat
           </span>
         )}
       </div>
+      )}
 
+      {show("brand") && (
       <div className={s.stack} style={{ gap: 8 }}>
         <span className={s.label}>EdAI branding</span>
         <Chips label="EdAI branding" options={["On", "Off"] as const} isOn={(c) => (c === "On") === state.brand} onToggle={(c) => state.setBrand(c === "On")} />
       </div>
+      )}
     </fieldset>
   );
 }

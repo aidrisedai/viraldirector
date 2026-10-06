@@ -21,6 +21,7 @@ type Props = {
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
 export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, onUpload, onAskLine, askBusy }: Props) {
+  const detailRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -74,6 +75,10 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, 
                     onPickShot(i);
                     setEditing(false);
                     setUploadError("");
+                    // On phones the details sit below the list: bring them (and the Record button) into view.
+                    if (window.matchMedia("(max-width: 820px)").matches) {
+                      requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                    }
                   }}
                 >
                   <span className={`${s.shotMark} ${kept[i] ? s.shotMarkDone : ""}`} aria-label={kept[i] ? "Recorded" : undefined}>{i + 1}</span>
@@ -87,7 +92,7 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onRecord, 
             ))}
           </div>
 
-          <div className={s.detail}>
+          <div className={s.detail} ref={detailRef} style={{ scrollMarginTop: 96 }}>
             <div className={s.stack} style={{ gap: 8 }}>
               <span className={s.eyebrow}>
                 SHOT {shot + 1} · <Term word={SHOT_TYPE_LABEL[cur.type]}>{SHOT_TYPE_LABEL[cur.type].toUpperCase()}</Term> ·{" "}

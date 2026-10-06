@@ -110,3 +110,131 @@
 .seg button { border: none; background: transparent; color: #F4EEE3; font: inherit; font-size: 12px; padding: 6px 12px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: #F4EEE3; color: #141413; }
 .danger { border-color: rgba(229, 72, 77, .5); color: #FFB4B6; }
+
+/* ---------- Phone editor: full screen, swipe to scrub, bottom sheets ---------- */
+.m {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
+  height: 100dvh; background: #0B0B0A; color: #F4EEE3; overscroll-behavior: contain;
+  padding-top: env(safe-area-inset-top); -webkit-tap-highlight-color: transparent;
+}
+.mTop { display: flex; align-items: center; gap: 4px; padding: 6px 10px; flex: none; }
+.mTitle { flex: 1; font-weight: 600; font-size: 16px; padding-left: 4px; }
+.mIcon {
+  width: 40px; height: 40px; border-radius: 20px; border: none; background: transparent; color: inherit;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 22px; line-height: 1; cursor: pointer;
+}
+.mIcon:active { background: rgba(244, 238, 227, .12); }
+.mIcon:disabled { opacity: .35; }
+.mExport {
+  margin-left: 6px; height: 36px; padding: 0 18px; border-radius: 18px; border: none; cursor: pointer;
+  background: var(--brand-accent); color: #fff; font: inherit; font-weight: 600; font-size: 15px;
+}
+.mExport:active { filter: brightness(.92); }
+
+.mStage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 4px 16px; }
+.mScreen {
+  position: relative; height: 100%; max-width: 100%; background: #000; border-radius: 14px; overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .5);
+}
+.mScreen canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.mBigPlay {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 32px;
+  background: rgba(0, 0, 0, .45); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center;
+  color: #fff; pointer-events: none;
+}
+
+.mTransport { display: flex; align-items: center; justify-content: space-between; padding: 6px 18px; flex: none; }
+
+.mTimelineWrap { position: relative; flex: none; }
+.mTimeline {
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  touch-action: pan-x; overscroll-behavior-x: contain;
+}
+.mTimeline::-webkit-scrollbar { display: none; }
+.mTrack { position: relative; height: 184px; }
+.mRuler { position: relative; height: 18px; }
+.mRuler .tickLabel { top: 2px; }
+.mLane { position: relative; height: 38px; margin-top: 4px; }
+.mBlock {
+  position: absolute; top: 0; bottom: 0; border-radius: 8px; padding: 0 10px; overflow: hidden; display: flex; align-items: center;
+  gap: 6px; font: inherit; font-size: 12px; white-space: nowrap; border: 2px solid transparent; color: inherit; text-align: left;
+  touch-action: pan-x; cursor: pointer;
+}
+.mGrab { touch-action: none; cursor: grab; z-index: 2; box-shadow: 0 0 0 2px #fff, 0 6px 18px rgba(0, 0, 0, .5); }
+.mHandle {
+  position: absolute; top: -2px; bottom: -2px; right: -2px; width: 22px; border-radius: 0 8px 8px 0;
+  background: #fff; touch-action: none;
+}
+.mHandle::after { content: ""; position: absolute; left: 9px; top: 30%; bottom: 30%; width: 3px; border-radius: 2px; background: #0B0B0A; }
+.mMusicLane {
+  position: absolute; bottom: 0; height: 30px; border-radius: 8px; background: rgba(31, 166, 122, .18);
+  display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 12px; color: rgba(244, 238, 227, .85); white-space: nowrap; overflow: hidden;
+}
+.mPlayhead {
+  position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: #fff; pointer-events: none;
+  box-shadow: 0 0 8px rgba(0, 0, 0, .6); z-index: 3;
+}
+.mPlayhead::before { content: ""; position: absolute; top: -2px; left: -5px; border: 6px solid transparent; border-top-color: #fff; }
+.mTransport > * { flex: 1; }
+.mTransport > .playBtn { flex: none; }
+.mZoom { display: flex; justify-content: flex-end; gap: 2px; }
+.mClockTotal { color: rgba(244, 238, 227, .45); }
+
+.mNotice {
+  position: absolute; left: 16px; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 4; padding: 10px 14px;
+  border-radius: 12px; background: rgba(244, 238, 227, .95); color: #0B0B0A; font-size: 13px;
+}
+
+.mBar {
+  flex: none; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(244, 238, 227, .1); background: #0B0B0A;
+}
+.mBar::-webkit-scrollbar { display: none; }
+.mTool {
+  flex: 1 0 auto; min-width: 60px; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; border: none; background: transparent; color: #F4EEE3; font: inherit; font-size: 11px; border-radius: 12px; cursor: pointer;
+}
+.mTool:active { background: rgba(244, 238, 227, .1); }
+.mToolGlyph { font-size: 22px; line-height: 20px; font-weight: 300; }
+.mToolValue { align-self: center; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; font-size: 13px; }
+.mDanger { color: #FF9EA1; }
+.mDone { color: #6FE0B5; }
+
+.mScrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, .25); animation: fadeIn .2s ease; }
+.mSheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 71; max-height: 62dvh; display: flex; flex-direction: column;
+  background: var(--cream-50, #FBF8F2); color: #0B0B0A; border-radius: 20px 20px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, .35);
+  animation: sheetUp .28s cubic-bezier(.2, .9, .3, 1); padding-bottom: env(safe-area-inset-bottom);
+}
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } }
+.mSheetHead { position: relative; display: flex; align-items: center; padding: 18px 16px 10px; flex: none; }
+.mGrabber { position: absolute; top: 7px; left: 50%; margin-left: -18px; width: 36px; height: 4px; border-radius: 2px; background: rgba(11, 11, 10, .2); }
+.mSheetTitle { flex: 1; font-family: var(--font-serif-display); font-size: 20px; }
+.mSheetDone {
+  border: none; background: #0B0B0A; color: #fff; border-radius: 16px; height: 32px; padding: 0 16px; font: inherit; font-weight: 600; cursor: pointer;
+}
+.mSheetBody { overflow-y: auto; padding: 4px 16px 20px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.mSheetHint { font-size: 13px; line-height: 1.5; color: rgba(11, 11, 10, .6); margin: 4px 0 0; grid-column: 1 / -1; }
+.mLight { display: flex; flex-direction: column; gap: 16px; }
+.mLight > * { border: none !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; }
+.mForm { display: flex; flex-direction: column; gap: 12px; }
+.mForm .seg { border-color: rgba(11, 11, 10, .2); align-self: flex-start; }
+.mForm .seg button { color: #0B0B0A; padding: 10px 16px; font-size: 14px; }
+.mForm .seg button[aria-pressed="true"] { background: #0B0B0A; color: #fff; }
+.mField {
+  font: inherit; font-size: 17px; color: #0B0B0A; background: #fff; border: 1.5px solid rgba(11, 11, 10, .15);
+  border-radius: 12px; padding: 12px 14px; outline: none; width: 100%;
+}
+.mField:focus { border-color: var(--brand-accent); }
+.mMediaGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mMediaItem, .mMediaNew {
+  display: flex; flex-direction: column; gap: 6px; border: none; background: transparent; padding: 0; font: inherit; font-size: 12px;
+  color: #0B0B0A; text-align: left; cursor: pointer; min-width: 0;
+}
+.mMediaItem img, .mMediaItem > span:first-child { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; background: #1d1d1b; display: block; }
+.mMediaItem span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mMediaNew {
+  aspect-ratio: 1; align-items: center; justify-content: center; text-align: center; border-radius: 12px;
+  border: 2px dashed rgba(11, 11, 10, .25); padding: 8px; color: rgba(11, 11, 10, .75);
+}

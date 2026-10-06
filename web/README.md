@@ -109,6 +109,14 @@ hand, no prompts needed:
 - Undo/redo (⌘/Ctrl+Z), Delete to remove the selected piece. The look controls (caption style, motion, title, music)
   update the preview immediately. Hand edits are saved as "Your edit"; the Director can still revise them.
 
+**On phones** (≤ 820 px) the editor opens full screen, built like a mobile editing app: the preview fills the top;
+the timeline scrolls under a fixed centre playhead (swipe to scrub, pinch or −/+ to zoom); a bottom tool bar opens
+sheets for Media (tap a picture or clip to put it at the playhead, or add from the phone), Text, Captions, Style,
+Music (live volume) and the Director; tapping a piece on the timeline swaps the bar for its actions (move by dragging,
+Shorter/Longer, Full/Card, Delete). Export lives in its own sheet. Recording is a full-screen camera with the
+teleprompter and shutter over it; the header collapses to one row with the steps scrolling sideways. The app has a web
+manifest and safe-area support, so "Add to Home Screen" opens it full screen like an app.
+
 **Export my video** (`components/director/render/`, logic in `lib/edit.ts`) turns the edit into one video file,
 entirely in the browser — nothing is uploaded:
 

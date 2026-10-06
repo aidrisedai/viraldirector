@@ -13,6 +13,7 @@ import { plannedSeconds, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/pl
 import { exportChecks, scriptText, slug, takeFileName, type Take } from "@/lib/takes";
 import { Chips } from "./Chips";
 import { Editor } from "./editor/Editor";
+import { COMPACT, useMediaQuery } from "./useMediaQuery";
 import { CaptionsCard } from "./export/CaptionsCard";
 import { ExtrasCard } from "./export/ExtrasCard";
 import { ImproveCard } from "./export/ImproveCard";
@@ -58,6 +59,9 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
 
   const [format, setFormat] = useState<FormatKey>(brief.platform === "LinkedIn" ? "4:5" : "9:16");
   const [render, setRender] = useState<Render>({ state: "idle" });
+  // Phones get a full-screen editor that opens on arrival.
+  const compact = useMediaQuery(COMPACT);
+  const [editorOpen, setEditorOpen] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const mime = useMemo(() => (typeof window === "undefined" ? null : outputType()), []);
@@ -317,9 +321,120 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
   };
 
   const length = render.state === "done" ? render.seconds : plannedSeconds(plan);
+  const exporting = render.state === "rendering" ? render.progress : render.state === "preparing" ? 0 : null;
+  const formatChips = (
+    <div className={s.stack} style={{ gap: 8 }}>
+      <span className={s.label}>Format</span>
+      <Chips label="Format" options={Object.keys(FORMATS) as FormatKey[]} isOn={(f) => f === format} onToggle={setFormat} />
+    </div>
+  );
+
+  /** Making the file: progress, the result, download and share. Shared by the page and the phone editor's sheet. */
+  const exportControls = (
+    <>
+      {render.state === "done" && (
+        <video key={render.url} className={s.exportResult} src={render.url} controls playsInline style={{ aspectRatio: render.format === "4:5" ? "4 / 5" : "9 / 16" }} />
+      )}
+      {busy && (
+        <div className={s.stack} style={{ gap: 6 }} aria-live="polite">
+          <span className={s.hint}>{render.state === "preparing" ? "Lining up your clips…" : `Making your video · ${Math.round(render.progress * 100)}%`}</span>
+          <div className={s.scrubLight}><div style={{ width: `${render.state === "rendering" ? render.progress * 100 : 0}%` }} /></div>
+        </div>
+      )}
+      {render.state === "error" && <p className={s.error} role="alert">{render.message}</p>}
+      {mime && !mime.includes("mp4") && (
+        <span className={s.hint}>This browser saves WebM. Instagram needs MP4 — create your video in Chrome, Edge or Safari for MP4.</span>
+      )}
+      <div className={s.actions}>
+        {busy ? (
+          <Button variant="outline" size="lg" onClick={() => abortRef.current?.abort()}>Cancel</Button>
+        ) : render.state === "done" ? (
+          <>
+            {canShare && <Button size="lg" icon="share" onClick={share}>Share</Button>}
+            <Button variant={canShare ? "secondary" : "primary"} size="lg" icon="download" onClick={() => download(render.url, fileName(render.mime))}>Download video</Button>
+            <Button variant="ghost" size="lg" icon="rotate-ccw" onClick={() => create()}>Export again</Button>
+          </>
+        ) : (
+          <Button size="lg" icon="download" onClick={() => create()} disabled={!cut.length || !mime}>
+            Export my video
+          </Button>
+        )}
+      </div>
+    </>
+  );
+
+  const postCaption = (
+    <div className={s.createCard}>
+      <div className={s.stack} style={{ gap: 4 }}>
+        <span className={s.createTitle}>Post caption</span>
+        <span className={s.hint}>The words that go under your video when you post it.</span>
+      </div>
+      {caption && (
+        <textarea className={s.captionInput} aria-label="Post caption" rows={4} value={caption} onChange={(e) => setCaption(e.target.value)} />
+      )}
+      {captionState === "error" && <span className={s.hint}>{captionError} Here’s a simple draft to start from.</span>}
+      <div className={s.actions}>
+        <Button variant={caption ? "outline" : "primary"} size="md" icon="message" onClick={writeCaption} disabled={captionState === "loading"}>
+          {captionState === "loading" ? "Writing…" : caption ? "Write another" : "Write my post caption"}
+        </Button>
+        {caption && <Button variant="ghost" size="md" icon={copied ? "check" : undefined} onClick={copyCaption}>{copied ? "Copied" : "Copy"}</Button>}
+      </div>
+    </div>
+  );
+
+  const editor = cut.length ? (
+    <Editor
+      timeline={timeline}
+      plan={editorPlan}
+      onPlan={onHandEdit}
+      state={finish}
+      format={format}
+      hookTitle={hookTitle}
+      shotTitles={plan.shots.map((x) => x.title)}
+      onAddFiles={addFiles}
+      onCaption={onCaption}
+      exporting={exporting}
+      compact={compact}
+      onClose={() => setEditorOpen(false)}
+      sheets={{
+        captions: (
+          <>
+            <LookControls state={finish} hookTitle={hookTitle} disabled={busy} only={["captions"]} />
+            <CaptionsCard clips={speaking} state={finish} />
+          </>
+        ),
+        style: (
+          <>
+            {formatChips}
+            <LookControls state={finish} hookTitle={hookTitle} disabled={busy} only={["motion", "title", "brand"]} />
+          </>
+        ),
+        music: <LookControls state={finish} hookTitle={hookTitle} disabled={busy} only={["music"]} />,
+        director: (
+          <>
+            <ImproveCard onImprove={improve} busy={busy} revisions={finish.revisions} />
+            <ExtrasCard state={finish} onPlan={askForEdit} planStale={planStale} />
+          </>
+        ),
+        export: (
+          <>
+            <span className={s.hint}>Makes the file exactly as the preview plays it — 1080p, ready to post. Keep this screen on while it’s made.</span>
+            {exportControls}
+            {postCaption}
+          </>
+        ),
+      }}
+    />
+  ) : (
+    <div className={s.createCard}>
+      <span className={s.hint}>Keep at least one take to start editing your video.</span>
+    </div>
+  );
 
   return (
     <main data-screen-label="06 Export" className={s.main}>
+      {/* The export draws here at full size; kept outside any sheet so it's always available. */}
+      <canvas ref={canvasRef} className={s.exportCanvas} aria-hidden />
       <div className={s.exportWrap}>
         <div className={s.exportHead}>
           <div className={s.stack} style={{ gap: 10 }}>
@@ -338,96 +453,48 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish }: Prop
           </div>
         </div>
 
-        {cut.length ? (
-          <Editor
-            timeline={timeline}
-            plan={editorPlan}
-            onPlan={onHandEdit}
-            state={finish}
-            format={format}
-            hookTitle={hookTitle}
-            shotTitles={plan.shots.map((x) => x.title)}
-            onAddFiles={addFiles}
-            onCaption={onCaption}
-            exporting={render.state === "rendering" ? render.progress : render.state === "preparing" ? 0 : null}
-          />
+        {compact ? (
+          <>
+            {editorOpen && editor}
+            {cut.length > 0 && (
+              <button type="button" className={s.openEditor} onClick={() => setEditorOpen(true)}>
+                <span className={s.openEditorIcon}><Icon name="play" size={22} /></span>
+                <span className={s.stack} style={{ gap: 2, alignItems: "flex-start" }}>
+                  <span className={s.createTitle}>{render.state === "done" ? "Edit again" : "Open the editor"}</span>
+                  <span className={s.hint}>Preview, add pictures and text, set the music, then export.</span>
+                </span>
+                <Icon name="chevron-right" size={20} />
+              </button>
+            )}
+            {render.state === "done" && <div className={s.createCard}>{exportControls}</div>}
+          </>
         ) : (
-          <div className={s.createCard}>
-            <span className={s.hint}>Keep at least one take to start editing your video.</span>
-          </div>
+          editor
         )}
 
         <div className={s.mid}>
         <div className={s.stack} style={{ gap: 28 }}>
-          <div className={s.createCard}>
-            <div className={s.stack} style={{ gap: 4 }}>
-              <span className={s.createTitle}>Export</span>
-              <span className={s.hint}>
-                Makes the file exactly as the preview plays it — 1080p, ready to post. It plays through once while it’s made, so
-                keep this tab open.
-              </span>
-            </div>
-            <div className={s.stack} style={{ gap: 8 }}>
-              <span className={s.label}>Format</span>
-              <Chips label="Format" options={Object.keys(FORMATS) as FormatKey[]} isOn={(f) => f === format} onToggle={setFormat} />
-            </div>
-            <LookControls state={finish} hookTitle={hookTitle} disabled={busy} />
-
-            <canvas ref={canvasRef} className={s.exportCanvas} aria-hidden />
-            {render.state === "done" && (
-              <video key={render.url} className={s.exportResult} src={render.url} controls playsInline style={{ aspectRatio: render.format === "4:5" ? "4 / 5" : "9 / 16" }} />
-            )}
-            {busy && (
-              <div className={s.stack} style={{ gap: 6 }} aria-live="polite">
-                <span className={s.hint}>{render.state === "preparing" ? "Lining up your clips…" : `Making your video · ${Math.round(render.progress * 100)}%`}</span>
-                <div className={s.scrubLight}><div style={{ width: `${render.state === "rendering" ? render.progress * 100 : 0}%` }} /></div>
+          {!compact && (
+            <div className={s.createCard}>
+              <div className={s.stack} style={{ gap: 4 }}>
+                <span className={s.createTitle}>Export</span>
+                <span className={s.hint}>
+                  Makes the file exactly as the preview plays it — 1080p, ready to post. It plays through once while it’s made, so
+                  keep this tab open.
+                </span>
               </div>
-            )}
-            {render.state === "error" && <p className={s.error} role="alert">{render.message}</p>}
-            {mime && !mime.includes("mp4") && (
-              <span className={s.hint}>This browser saves WebM. Instagram needs MP4 — create your video in Chrome, Edge or Safari for MP4.</span>
-            )}
-
-            <div className={s.actions}>
-              {busy ? (
-                <Button variant="outline" size="lg" onClick={() => abortRef.current?.abort()}>Cancel</Button>
-              ) : render.state === "done" ? (
-                <>
-                  <Button size="lg" icon="download" onClick={() => download(render.url, fileName(render.mime))}>Download video</Button>
-                  {canShare && <Button variant="secondary" size="lg" icon="share" onClick={share}>Share</Button>}
-                  <Button variant="ghost" size="lg" icon="rotate-ccw" onClick={() => create()}>Export again</Button>
-                </>
-              ) : (
-                <Button size="lg" icon="download" onClick={() => create()} disabled={!cut.length || !mime}>
-                  Export my video
-                </Button>
-              )}
+              {formatChips}
+              <LookControls state={finish} hookTitle={hookTitle} disabled={busy} />
+              {exportControls}
             </div>
-          </div>
-
-          <div className={s.createCard}>
-            <div className={s.stack} style={{ gap: 4 }}>
-              <span className={s.createTitle}>Post caption</span>
-              <span className={s.hint}>The words that go under your video when you post it.</span>
-            </div>
-            {caption && (
-              <textarea className={s.captionInput} aria-label="Post caption" rows={4} value={caption} onChange={(e) => setCaption(e.target.value)} />
-            )}
-            {captionState === "error" && <span className={s.hint}>{captionError} Here’s a simple draft to start from.</span>}
-            <div className={s.actions}>
-              <Button variant={caption ? "outline" : "primary"} size="md" icon="message" onClick={writeCaption} disabled={captionState === "loading"}>
-                {captionState === "loading" ? "Writing…" : caption ? "Write another" : "Write my post caption"}
-              </Button>
-              {caption && <Button variant="ghost" size="md" icon={copied ? "check" : undefined} onClick={copyCaption}>{copied ? "Copied" : "Copy"}</Button>}
-            </div>
-          </div>
-
+          )}
+          {postCaption}
         </div>
 
         <div className={s.stack} style={{ gap: 28 }}>
-          <ImproveCard onImprove={improve} busy={busy} revisions={finish.revisions} />
-          <CaptionsCard clips={speaking} state={finish} />
-          <ExtrasCard state={finish} onPlan={askForEdit} planStale={planStale} />
+          {!compact && <ImproveCard onImprove={improve} busy={busy} revisions={finish.revisions} />}
+          {!compact && <CaptionsCard clips={speaking} state={finish} />}
+          {!compact && <ExtrasCard state={finish} onPlan={askForEdit} planStale={planStale} />}
 
           <div className={s.settings}>
             <div className={s.setting}>

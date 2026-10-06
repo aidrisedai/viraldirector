@@ -23,12 +23,16 @@ export const metadata: Metadata = {
   applicationName: "ViralDirector",
   openGraph: { title: "ViralDirector", description, type: "website", siteName: "ViralDirector" },
   twitter: { card: "summary", title: "ViralDirector", description },
+  // Added to a phone's home screen, it opens full screen like an app.
+  appleWebApp: { capable: true, title: "ViralDirector", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
   themeColor: "#F4EEE3",
   width: "device-width",
   initialScale: 1,
+  // Lets full-screen views (camera, editor) reach the edges; they pad for the notch and home bar.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

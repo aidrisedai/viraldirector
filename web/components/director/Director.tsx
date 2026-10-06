@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ds/Button";
 import { applyHook, DEFAULT_BRIEF, type Brief, type Plan, type PlanResponse } from "@/lib/plan";
 import { clearProject, loadProject, saveProject } from "@/lib/storage";
@@ -34,6 +34,7 @@ export function Director() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [restored, setRestored] = useState(false);
+  const stepsRef = useRef<HTMLElement>(null);
 
   // Restore the last project after mount (localStorage isn't available during SSR).
   useEffect(() => {
@@ -54,6 +55,14 @@ export function Director() {
   useEffect(() => {
     if (restored) saveProject({ brief, plan, sample, hook, shot });
   }, [restored, brief, plan, sample, hook, shot]);
+
+  // On phones the steps scroll sideways: keep the current one in view, and start each step at the top.
+  useEffect(() => {
+    const nav = stepsRef.current;
+    const on = nav?.querySelector<HTMLElement>("[aria-current=step]");
+    if (nav && on) nav.scrollTo({ left: on.offsetLeft - nav.clientWidth / 2 + on.clientWidth / 2, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
+  }, [step]);
 
   // Takes live only in memory, so warn before a refresh throws them away.
   useEffect(() => {
@@ -167,7 +176,7 @@ export function Director() {
             </>
           )}
         </div>
-        <nav className={s.steps} aria-label="Steps">
+        <nav className={s.steps} aria-label="Steps" ref={stepsRef}>
           {STEPS.map((label, i) => {
             const n = (i + 1) as Step;
             const cls = n === step ? s.stepOn : n < step ? s.stepDone : "";
@@ -187,10 +196,10 @@ export function Director() {
           })}
         </nav>
         <div className={s.headerActions}>
-          <Button variant={chat.open ? "secondary" : "outline"} size="sm" icon="message" onClick={() => chat.setOpen(!chat.open)} aria-expanded={chat.open}>
-            Ask the Director
+          <Button variant={chat.open ? "secondary" : "outline"} size="sm" icon="message" onClick={() => chat.setOpen(!chat.open)} aria-expanded={chat.open} aria-label="Ask the Director">
+            <span className={s.wideOnly}>Ask the Director</span>
           </Button>
-          {plan && <Button variant="ghost" size="sm" onClick={reset}>New video</Button>}
+          {plan && <Button variant="ghost" size="sm" onClick={reset}>New<span className={s.wideOnly}>&nbsp;video</span></Button>}
         </div>
       </header>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Icon } from "@/components/ds/Icon";
 import type { FormatKey, Segment } from "@/lib/edit";
 import { composeEdit, normalizePlan, type EditPlan, type Extra, type Style } from "@/lib/editPlan";
@@ -12,12 +12,22 @@ import type { ExportState } from "../export/useExportState";
 import { buildScene } from "../render/compositor";
 import { Engine } from "../render/engine";
 import { generatedTrack } from "../render/musicTrack";
+import { useThumb } from "./useThumb";
 import e from "./editor.module.css";
+
+/** A media thumbnail that works on phones (videos get a real still). */
+function Thumb({ url, kind, className }: { url: string; kind: "image" | "video"; className?: string }) {
+  const src = useThumb(url, kind);
+  // eslint-disable-next-line @next/next/no-img-element -- local blob / data preview
+  return src ? <img className={className} src={src} alt="" draggable={false} /> : <span className={className} />;
+}
 
 type Selection = { kind: "cutaway" | "callout"; index: number } | { kind: "clip"; segment: number } | null;
 type BinItem = { source: string; name: string; kind: "image" | "video"; url: string; seconds: number | null };
 type BlockDrag = { kind: "cutaway" | "callout"; index: number; mode: "move" | "resize"; startX: number; dx: number; start: number; seconds: number };
 type BinDrag = { item: BinItem; x: number; y: number; moved: boolean; over: boolean };
+/** Bottom sheets in the phone editor. The first five are filled by the Export step. */
+export type SheetName = "captions" | "style" | "music" | "director" | "export" | "media" | "text" | "clip";
 
 type Props = {
   timeline: Segment[] | null;
@@ -33,6 +43,18 @@ type Props = {
   onCaption: (takeId: string, text: string) => void;
   /** While the final file is being made, the preview pauses and shows progress. */
   exporting: number | null;
+  /** Phone layout: a full-screen editor with a scroll-to-scrub timeline and bottom sheets. */
+  compact?: boolean;
+  onClose?: () => void;
+  sheets?: Partial<Record<"captions" | "style" | "music" | "director" | "export", ReactNode>>;
+};
+
+/** Phone timeline scale at zoom 1, in pixels per second. */
+const MOBILE_PPS = 64;
+const buzz = () => {
+  try {
+    navigator.vibrate?.(8);
+  } catch {}
 };
 
 const LABEL_W = 76;
@@ -40,7 +62,7 @@ const fmt = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart
 const isTyping = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 
 /** The editor: a live preview of the finished video, a timeline to arrange it by hand, and an inspector. */
-export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotTitles, onAddFiles, onCaption, exporting }: Props) {
+export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotTitles, onAddFiles, onCaption, exporting, compact = false, onClose, sheets = {} }: Props) {
   const { style, extras, brand, music, customMusic } = state;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
@@ -65,13 +87,38 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
   const past = useRef<EditPlan[]>([]);
   const future = useRef<EditPlan[]>([]);
   const [history, setHistory] = useState({ past: 0, future: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [viewW, setViewW] = useState(360);
+  const [sheet, setSheet] = useState<SheetName | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const expectedScroll = useRef(-1);
+  const compactRef = useRef(compact);
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
   const syncHistory = () => setHistory({ past: past.current.length, future: future.current.length });
 
   // ---------- engine ----------
   const placePlayhead = useCallback(() => {
+    // Phone: the playhead stays in the middle and the timeline scrolls under it.
+    if (compactRef.current) {
+      const el = scrollRef.current;
+      if (el) {
+        const x = timeRef.current * ppsRef.current;
+        expectedScroll.current = x;
+        el.scrollLeft = x;
+      }
+      return;
+    }
     if (playheadRef.current) playheadRef.current.style.transform = `translateX(${LABEL_W + timeRef.current * ppsRef.current}px)`;
   }, []);
+  useEffect(() => {
+    compactRef.current = compact;
+  }, [compact]);
 
+  // The engine draws into this layout's canvas; switching layouts (a tablet rotating) makes a new one.
+  const [engineId, setEngineId] = useState(0);
   useEffect(() => {
     const engine = new Engine(canvasRef.current!, "preview", 0.5);
     engine.onPlayingChange = setPlaying;
@@ -86,11 +133,14 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
       }
     };
     engineRef.current = engine;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new engine needs its scene and music again
+    setEngineId((n) => n + 1);
+    setReady(false);
     return () => {
       engine.dispose();
       engineRef.current = null;
     };
-  }, [placePlayhead]);
+  }, [placePlayhead, compact]);
 
   const lookKey = JSON.stringify({ ...style, musicVolume: 0 });
   const look = useMemo(() => JSON.parse(lookKey) as Style, [lookKey]);
@@ -108,7 +158,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
       engineRef.current?.setScene(scene, extras).then(() => setReady(true)).catch(() => setNotice("Couldn’t load one of the clips."));
     }, 120);
     return () => clearTimeout(id);
-  }, [scene, extras]);
+  }, [scene, extras, engineId]);
 
   // Music: the generated bed is rendered a little longer than the video, in 30 s steps.
   const musicLength = Math.max(60, Math.ceil((total + 2) / 30) * 30);
@@ -121,8 +171,8 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
     return () => {
       live = false;
     };
-  }, [music, customMusic, musicLength]);
-  useEffect(() => engineRef.current?.setMusicVolume(style.musicVolume), [style.musicVolume]);
+  }, [music, customMusic, musicLength, engineId]);
+  useEffect(() => engineRef.current?.setMusicVolume(style.musicVolume), [style.musicVolume, engineId]);
 
   useEffect(() => {
     if (exporting !== null) engineRef.current?.pause();
@@ -137,7 +187,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
     return () => ro.disconnect();
   }, []);
   const laneW = Math.max(100, width - LABEL_W);
-  const pps = total > 0 ? laneW / total : 1;
+  const pps = compact ? MOBILE_PPS * zoom : total > 0 ? laneW / total : 1;
   useEffect(() => {
     ppsRef.current = pps;
     placePlayhead();
@@ -362,6 +412,64 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [binDrag === null]);
 
+  // ---------- phone: scroll to scrub, pinch to zoom, sheets ----------
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!compact || !el) return;
+    const ro = new ResizeObserver(() => setViewW(el.clientWidth));
+    ro.observe(el);
+    // Two fingers on the timeline zoom it, keeping the playhead's moment in place.
+    let start: { d: number; z: number } | null = null;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onStart = (ev: TouchEvent) => {
+      if (ev.touches.length === 2) start = { d: dist(ev.touches), z: zoomRef.current };
+    };
+    const onMove = (ev: TouchEvent) => {
+      if (ev.touches.length !== 2 || !start) return;
+      ev.preventDefault();
+      setZoom(Math.min(4, Math.max(0.35, start.z * (dist(ev.touches) / start.d))));
+    };
+    const onEnd = (ev: TouchEvent) => {
+      if (ev.touches.length < 2) start = null;
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+    };
+  }, [compact]);
+  /** The creator scrolled the timeline: pause and show that moment. */
+  const onTimelineScroll = () => {
+    const el = scrollRef.current;
+    if (!el || Math.abs(el.scrollLeft - expectedScroll.current) < 1.5) return;
+    expectedScroll.current = -1;
+    const engine = engineRef.current;
+    if (engine?.isPlaying) engine.pause();
+    const t = Math.max(0, Math.min(el.scrollLeft / ppsRef.current, total));
+    timeRef.current = t;
+    setTime(t);
+    engine?.seek(t);
+  };
+
+  // While the editor fills the phone screen, the page behind it doesn't scroll.
+  useEffect(() => {
+    if (!compact) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [compact]);
+
+  const openSheet = (name: SheetName | null) => {
+    engineRef.current?.pause();
+    setSheet(name);
+  };
+
   // ---------- render ----------
   // Label spacing that never crowds: the smallest step at least 48 px apart.
   const ticks = useMemo(() => {
@@ -375,6 +483,306 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
   const selClip = sel?.kind === "clip" && timeline ? timeline[sel.segment] : undefined;
   const nameOf = (source: string) => binItems.find((b) => b.source === source);
   const dropped = (plan?.drop ?? []).filter((d) => timeline?.[d]);
+
+  if (compact) {
+    const pad = viewW / 2;
+    const trackW = pad * 2 + total * pps;
+    const x = (t: number) => pad + t * pps;
+    const fileInput = (
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        hidden
+        onChange={(ev) => {
+          const files = Array.from(ev.target.files ?? []);
+          ev.target.value = "";
+          setSheet(null);
+          if (files.length) addFiles(files, timeRef.current);
+        }}
+      />
+    );
+    const step = (dir: -1 | 1) => (dur: number) => Math.round(Math.max(0.8, dur + dir * 0.5) * 10) / 10;
+    const tools: { name: SheetName | "text-add"; icon: Parameters<typeof Icon>[0]["name"]; label: string }[] = [
+      { name: "media", icon: "image-plus", label: "Media" },
+      { name: "text-add", icon: "type", label: "Text" },
+      { name: "captions", icon: "message", label: "Captions" },
+      { name: "style", icon: "sparkles", label: "Style" },
+      { name: "music", icon: "volume", label: "Music" },
+      { name: "director", icon: "zap", label: "Director" },
+    ];
+    const sheetTitle: Record<SheetName, string> = {
+      media: "Pictures & clips", text: "Text", captions: "Captions", style: "Style", music: "Music", director: "Ask the Director",
+      export: "Export", clip: "This clip",
+    };
+
+    return (
+      <section className={e.m} aria-label="Video editor">
+        <header className={e.mTop}>
+          <button type="button" className={e.mIcon} onClick={onClose} aria-label="Close editor"><Icon name="x" size={20} /></button>
+          <span className={e.mTitle}>Edit</span>
+          <button type="button" className={e.mIcon} onClick={undo} disabled={!history.past} aria-label="Undo"><Icon name="undo" size={18} /></button>
+          <button type="button" className={e.mIcon} onClick={redo} disabled={!history.future} aria-label="Redo"><Icon name="redo" size={18} /></button>
+          <button type="button" className={e.mExport} onClick={() => openSheet("export")}>Export</button>
+        </header>
+
+        <div className={e.mStage} onClick={toggle}>
+          <div className={e.mScreen} style={{ aspectRatio: format === "4:5" ? "4 / 5" : "9 / 16" }}>
+            <canvas ref={canvasRef} aria-label="Preview of your video" />
+            {!ready && <div className={e.screenNote}>Lining up your clips…</div>}
+            {exporting !== null && <div className={e.screenNote}>Making the final file · {Math.round(exporting * 100)}%<br />Keep this screen on.</div>}
+            {ready && !playing && exporting === null && (
+              <span className={e.mBigPlay} aria-hidden><Icon name="play" size={30} /></span>
+            )}
+          </div>
+        </div>
+
+        <div className={e.mTransport}>
+          <span className={e.clock}>{fmt(time)} <span className={e.mClockTotal}>/ {fmt(total)}</span></span>
+          <button type="button" className={e.playBtn} onClick={toggle} disabled={!ready || exporting !== null} aria-label={playing ? "Pause" : "Play"}>
+            <Icon name={playing ? "pause" : "play"} size={20} />
+          </button>
+          <span className={e.mZoom}>
+            <button type="button" className={e.mIcon} onClick={() => setZoom((z) => Math.max(0.35, z / 1.5))} aria-label="Zoom out">−</button>
+            <button type="button" className={e.mIcon} onClick={() => setZoom((z) => Math.min(4, z * 1.5))} aria-label="Zoom in">+</button>
+          </span>
+        </div>
+
+        <div className={e.mTimelineWrap}>
+          <div ref={scrollRef} className={e.mTimeline} onScroll={onTimelineScroll} aria-label="Timeline — swipe to move through your video">
+            <div className={e.mTrack} style={{ width: trackW }}>
+              <div className={e.mRuler}>
+                {ticks.map((t) => (
+                  <span key={t} className={e.tickLabel} style={{ left: x(t) }}>{fmt(t).replace(/\.\d$/, "")}</span>
+                ))}
+              </div>
+              <div className={e.mLane}>
+                {lay?.clips.map((c) => (
+                  <button
+                    type="button"
+                    key={c.segment}
+                    className={`${e.mBlock} ${e.clipBlock} ${c.speech ? e.clipSpeech : ""} ${sel?.kind === "clip" && sel.segment === c.segment ? e.blockSel : ""}`}
+                    style={{ left: x(c.start) + 1, width: Math.max(6, (c.end - c.start) * pps - 2) }}
+                    onClick={() => {
+                      buzz();
+                      setSelected({ kind: "clip", segment: c.segment });
+                    }}
+                  >
+                    {shotTitles[c.shot] ?? `Shot ${c.shot + 1}`}
+                  </button>
+                ))}
+                {scene && brand && (
+                  <div className={`${e.mBlock} ${e.endBlock}`} style={{ left: x(scene.seqSeconds) + 1, width: Math.max(6, (total - scene.seqSeconds) * pps - 2) }}>End card</div>
+                )}
+              </div>
+              <div className={e.mLane}>
+                {plan && lay && plan.cutaways.map((c, i) => {
+                  const at = toVideoTime(lay, c.segment, c.at);
+                  if (at === null) return null;
+                  const pos = dragged("cutaway", i, at, c.seconds);
+                  const item = nameOf(c.source);
+                  const on = sel?.kind === "cutaway" && sel.index === i;
+                  return (
+                    <div
+                      key={`${c.source}-${i}`}
+                      className={`${e.mBlock} ${e.overlayBlock} ${c.style === "pip" ? e.pipBlock : ""} ${on ? `${e.blockSel} ${e.mGrab}` : ""}`}
+                      style={{ left: x(pos.start), width: Math.max(10, pos.seconds * pps) }}
+                      onPointerDown={on ? (ev) => startBlock(ev, "cutaway", i, "move", at, c.seconds) : undefined}
+                      onClick={() => {
+                        if (!on) buzz();
+                        setSelected({ kind: "cutaway", index: i });
+                      }}
+                    >
+                      {item?.kind === "image" ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- local blob preview
+                        <img className={e.thumbMini} src={item.url} alt="" />
+                      ) : (
+                        <Icon name="video" size={12} />
+                      )}
+                      {item?.name ?? "Overlay"}
+                      {on && <span className={e.mHandle} onPointerDown={(ev) => startBlock(ev, "cutaway", i, "resize", at, c.seconds)} />}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className={e.mLane}>
+                {plan && lay && plan.callouts.map((c, i) => {
+                  const at = toVideoTime(lay, c.segment, c.at);
+                  if (at === null) return null;
+                  const pos = dragged("callout", i, at, c.seconds);
+                  const on = sel?.kind === "callout" && sel.index === i;
+                  return (
+                    <div
+                      key={`${c.text}-${i}`}
+                      className={`${e.mBlock} ${e.textBlock} ${c.style === "stat" ? e.statBlock : ""} ${on ? `${e.blockSel} ${e.mGrab}` : ""}`}
+                      style={{ left: x(pos.start), width: Math.max(10, pos.seconds * pps) }}
+                      onPointerDown={on ? (ev) => startBlock(ev, "callout", i, "move", at, c.seconds) : undefined}
+                      onClick={() => {
+                        if (!on) buzz();
+                        setSelected({ kind: "callout", index: i });
+                      }}
+                    >
+                      <Icon name="type" size={12} /> {c.text}
+                      {on && <span className={e.mHandle} onPointerDown={(ev) => startBlock(ev, "callout", i, "resize", at, c.seconds)} />}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className={`${e.mLane} ${e.mMusicLane}`} style={{ left: pad, width: total * pps }}>
+                <Icon name="volume" size={12} /> {music === "No music" ? "No music" : music === "My music" ? (customMusic?.name ?? "Choose a song") : music} · {Math.round(style.musicVolume * 100)}%
+              </div>
+            </div>
+          </div>
+          <div className={e.mPlayhead} aria-hidden />
+        </div>
+
+        {notice && <div className={e.mNotice} role="status" onClick={() => setNotice("")}>{notice}</div>}
+
+        <nav className={e.mBar} aria-label={sel ? "Edit selected" : "Tools"}>
+          {selCutaway && sel?.kind === "cutaway" && lay ? (
+            <>
+              <button type="button" className={e.mTool} onClick={() => commit(updateCutaway(plan!, sel.index, { style: selCutaway.style === "pip" ? "full" : "pip" }))}>
+                <Icon name="scan-face" size={20} />{selCutaway.style === "pip" ? "Make full" : "Make card"}
+              </button>
+              <button type="button" className={e.mTool} onClick={() => commit(updateCutaway(plan!, sel.index, { seconds: step(-1)(selCutaway.seconds) }))}>
+                <span className={e.mToolGlyph}>−</span>Shorter
+              </button>
+              <span className={e.mToolValue}>{selCutaway.seconds.toFixed(1)}s</span>
+              <button type="button" className={e.mTool} onClick={() => commit(updateCutaway(plan!, sel.index, { seconds: Math.min(step(1)(selCutaway.seconds), roomAt(lay, selCutaway.segment, selCutaway.at)) }))}>
+                <span className={e.mToolGlyph}>+</span>Longer
+              </button>
+              <button type="button" className={`${e.mTool} ${e.mDanger}`} onClick={removeSelected}><Icon name="trash" size={20} />Delete</button>
+              <button type="button" className={`${e.mTool} ${e.mDone}`} onClick={() => setSelected(null)}><Icon name="check" size={20} />Done</button>
+            </>
+          ) : selCallout && sel?.kind === "callout" && lay ? (
+            <>
+              <button type="button" className={e.mTool} onClick={() => openSheet("text")}><Icon name="pencil" size={20} />Edit</button>
+              <button type="button" className={e.mTool} onClick={() => commit(updateCallout(plan!, sel.index, { style: selCallout.style === "stat" ? "label" : "stat" }))}>
+                <Icon name="type" size={20} />{selCallout.style === "stat" ? "Label" : "Number"}
+              </button>
+              <button type="button" className={e.mTool} onClick={() => commit(updateCallout(plan!, sel.index, { seconds: step(-1)(selCallout.seconds) }))}>
+                <span className={e.mToolGlyph}>−</span>Shorter
+              </button>
+              <button type="button" className={e.mTool} onClick={() => commit(updateCallout(plan!, sel.index, { seconds: Math.min(step(1)(selCallout.seconds), roomAt(lay, selCallout.segment, selCallout.at)) }))}>
+                <span className={e.mToolGlyph}>+</span>Longer
+              </button>
+              <button type="button" className={`${e.mTool} ${e.mDanger}`} onClick={removeSelected}><Icon name="trash" size={20} />Delete</button>
+              <button type="button" className={`${e.mTool} ${e.mDone}`} onClick={() => setSelected(null)}><Icon name="check" size={20} />Done</button>
+            </>
+          ) : selClip && sel?.kind === "clip" ? (
+            <>
+              {selClip.speech && <button type="button" className={e.mTool} onClick={() => openSheet("clip")}><Icon name="message" size={20} />Captions</button>}
+              <button type="button" className={`${e.mTool} ${e.mDanger}`} onClick={removeSelected}><Icon name="trash" size={20} />Remove clip</button>
+              {dropped.length > 0 && (
+                <button type="button" className={e.mTool} onClick={() => commit(toggleDrop(plan!, dropped[dropped.length - 1]))}><Icon name="undo" size={20} />Put back</button>
+              )}
+              <button type="button" className={`${e.mTool} ${e.mDone}`} onClick={() => setSelected(null)}><Icon name="check" size={20} />Done</button>
+            </>
+          ) : (
+            <>
+              {tools.map((t) => (
+                <button
+                  key={t.name}
+                  type="button"
+                  className={e.mTool}
+                  onClick={() => {
+                    if (t.name === "text-add") {
+                      addText();
+                      openSheet("text");
+                    } else openSheet(t.name);
+                  }}
+                >
+                  <Icon name={t.icon} size={20} />
+                  {t.label}
+                </button>
+              ))}
+              {dropped.length > 0 && (
+                <button type="button" className={e.mTool} onClick={() => commit(toggleDrop(plan!, dropped[dropped.length - 1]))}><Icon name="undo" size={20} />Put back</button>
+              )}
+            </>
+          )}
+        </nav>
+        {fileInput}
+
+        {sheet && (
+          <>
+            <div className={e.mScrim} onClick={() => setSheet(null)} />
+            <div className={e.mSheet} role="dialog" aria-label={sheetTitle[sheet]}>
+              <div className={e.mSheetHead}>
+                <span className={e.mGrabber} aria-hidden />
+                <span className={e.mSheetTitle}>{sheetTitle[sheet]}</span>
+                <button type="button" className={e.mSheetDone} onClick={() => setSheet(null)}>Done</button>
+              </div>
+              <div className={e.mSheetBody}>
+                {sheet === "media" && (
+                  <div className={e.mMediaGrid}>
+                    <button type="button" className={e.mMediaNew} onClick={() => fileRef.current?.click()}>
+                      <Icon name="plus" size={22} />Add from your phone
+                    </button>
+                    {binItems.map((item) => (
+                      <button
+                        type="button"
+                        key={item.source}
+                        className={e.mMediaItem}
+                        onClick={() => {
+                          addAtPlayhead(item);
+                          setSheet(null);
+                          buzz();
+                        }}
+                      >
+                        <Thumb url={item.url} kind={item.kind} />
+                        <span>{item.name}</span>
+                      </button>
+                    ))}
+                    <p className={e.mSheetHint}>Tap one to put it at the playhead ({fmt(time)}). Then drag it on the timeline, or use Shorter / Longer.</p>
+                  </div>
+                )}
+                {sheet === "text" && selCallout && sel?.kind === "callout" && (
+                  <div className={e.mForm}>
+                    <input
+                      className={e.mField}
+                      aria-label="On-screen text"
+                      maxLength={48}
+                      value={selCallout.text}
+                      autoFocus
+                      onFocus={(ev) => selCallout.text === "Your text" && ev.currentTarget.select()}
+                      onChange={(ev) => onPlan(updateCallout(plan!, sel.index, { text: ev.target.value || " " }))}
+                      enterKeyHint="done"
+                      onKeyDown={(ev) => ev.key === "Enter" && setSheet(null)}
+                    />
+                    <div className={e.seg} role="group" aria-label="Text style">
+                      <button type="button" aria-pressed={selCallout.style === "label"} onClick={() => commit(updateCallout(plan!, sel.index, { style: "label" }))}>Label</button>
+                      <button type="button" aria-pressed={selCallout.style === "stat"} onClick={() => commit(updateCallout(plan!, sel.index, { style: "stat" }))}>Big number</button>
+                    </div>
+                    <p className={e.mSheetHint}>Big numbers count up on screen — try “200 users”.</p>
+                  </div>
+                )}
+                {sheet === "text" && !selCallout && <p className={e.mSheetHint}>No room for text here — move the playhead onto a clip.</p>}
+                {sheet === "clip" && selClip && (
+                  <div className={e.mForm}>
+                    <textarea
+                      className={e.mField}
+                      aria-label="Captions for this clip"
+                      rows={4}
+                      defaultValue={selClip.words.map((w) => w.word).join(" ")}
+                      key={selClip.take.id}
+                      onBlur={(ev) => onCaption(selClip.take.id, ev.target.value)}
+                    />
+                    <p className={e.mSheetHint}>Fix any word — the timing stays matched to your voice.</p>
+                  </div>
+                )}
+                {(sheet === "captions" || sheet === "style" || sheet === "music" || sheet === "director" || sheet === "export") && (
+                  <div className={e.mLight}>{sheets[sheet]}</div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+      </section>
+    );
+  }
 
   return (
     <section className={e.editor} aria-label="Video editor">
@@ -558,12 +966,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
               }}
               title="Drag onto the Overlays row, or add at the playhead"
             >
-              {item.kind === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element -- local blob preview
-                <img className={e.binThumb} src={item.url} alt="" draggable={false} />
-              ) : (
-                <video className={e.binThumb} src={`${item.url}#t=0.5`} muted playsInline preload="metadata" />
-              )}
+              <Thumb className={e.binThumb} url={item.url} kind={item.kind} />
               <span className={e.binName}>{item.name}</span>
               <button type="button" className={e.binAdd} onClick={() => addAtPlayhead(item)}>+ At playhead</button>
             </div>
