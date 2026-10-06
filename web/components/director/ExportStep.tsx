@@ -8,6 +8,7 @@ import {
   applyTrims, composeEdit, EXTRAS_MAX, fallbackPlan, LOOKS, normalizePlan, timelineForDirector,
   type EditPlan, type EditRequest, type EditResponse, type Extra, type Look, type Style,
 } from "@/lib/editPlan";
+import { editBrief } from "@/lib/editBrief";
 import { toSrt } from "@/lib/srt";
 import { AI_LABEL_NOTE } from "@/lib/aiPrompts";
 import { reviseLocally } from "@/lib/revise";
@@ -281,6 +282,44 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     return composeEdit(timeline, normalizePlan(chosen, timeline, finish.extras, { strict: false }));
   };
 
+  /** The edit written out for another AI video editor (the version on screen). */
+  const [briefCopied, setBriefCopied] = useState(false);
+  const makeBrief = async () => {
+    const edit = await composed();
+    const p = finish.editPlan && !planStale ? finish.editPlan.plan : null;
+    return editBrief({
+      concept: brief.concept,
+      platform: brief.platform,
+      audience: brief.audience,
+      version: finish.version,
+      style: finish.style,
+      format,
+      edit,
+      takeFiles: Object.fromEntries(cut.map(({ take, shot }) => [take.id, takeFileName(take, shot)])),
+      shotTitles,
+      extras: Object.fromEntries(finish.extras.map((e) => [e.id, { name: e.name, note: e.note }])),
+      music: finish.music === "My music" ? "My music" : finish.music,
+      brand: finish.brand,
+      altHooks: p?.altHooks ?? [],
+      summary: p?.summary ?? "",
+    });
+  };
+  const copyBrief = async () => {
+    const text = await makeBrief();
+    try {
+      await navigator.clipboard.writeText(text);
+      setBriefCopied(true);
+      setTimeout(() => setBriefCopied(false), 1800);
+    } catch {
+      downloadText(text, `${slug(brief.concept)}-${finish.version.toLowerCase()}-edit-prompt.md`, "text/markdown");
+    }
+  };
+  const downloadText = (text: string, name: string, type: string) => {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    download(url, name);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   /** Captions as an SRT file, timed to the finished video. */
   const downloadSrt = async () => {
     const edit = await composed();
@@ -434,12 +473,22 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
       </div>
       <div className={s.actions}>
         <Button variant="ghost" size="sm" icon="download" onClick={downloadSrt} disabled={!cut.length || busy}>Captions (.srt)</Button>
+        <Button variant="ghost" size="sm" icon={briefCopied ? "check" : "message"} onClick={copyBrief} disabled={!cut.length || busy}>
+          {briefCopied ? "Copied" : "Copy as prompt"}
+        </Button>
+        <Button variant="ghost" size="sm" icon="download" onClick={async () => downloadText(await makeBrief(), `${slug(brief.concept)}-${finish.version.toLowerCase()}-edit-prompt.md`, "text/markdown")} disabled={!cut.length || busy}>
+          Prompt (.md)
+        </Button>
         {otherDone && !busy && (
           <Button variant="ghost" size="sm" icon="download" onClick={() => download(otherDone.url, fileName(otherDone.mime, other))}>
             {other} version
           </Button>
         )}
       </div>
+      <span className={s.hint}>
+        Prefer another AI video editor? “Copy as prompt” writes this version out — every cut, overlay, card and caption with
+        timings — to paste with your clips (“Raw takes” downloads them with the matching names).
+      </span>
     </>
   );
 

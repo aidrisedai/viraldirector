@@ -224,6 +224,10 @@ Rendering is real time (a 45s video takes about 45s) and needs the tab to stay v
   is marked AI-made, the Director is told it's an illustration, and Export reminds the creator to turn on the
   platform's AI label. Neither is offered for shots of the creator, real people, reactions, results or screen
   recordings — those must be real.
+- **Copy as prompt** (`lib/editBrief.ts`): writes the version on screen out as a brief for another AI video editor —
+  the house style, every file, the timeline with in and out points, overlays, cards, big words and titles with
+  timings, the payoff point, look, music and branding, the alternative hooks, the Director's notes and the SRT. Copy it
+  or download it as Markdown; "Raw takes" downloads the clips with the file names the brief uses.
 - **Captions (.srt)** (`lib/srt.ts`): downloads the captions timed to the finished video, in short phrases, for platforms
   that take a separate caption file.
 - **Look** (`export/LookControls.tsx`): caption style, size and position, transition, energy, the opening title
