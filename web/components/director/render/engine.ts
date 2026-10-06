@@ -3,7 +3,7 @@
 import { musicGains } from "@/lib/audioMix";
 import { FORMATS, TARGET_RMS } from "@/lib/edit";
 import type { ComposedSegment, Extra } from "@/lib/editPlan";
-import { loadFonts, makeCompositor, overlayKey, segmentAt, type Compositor, type Media, type Scene } from "./compositor";
+import { loadFonts, makeCompositor, overlayKey, segmentAt, type Compositor, type Grade, type Media, type Scene } from "./compositor";
 import type { MusicTrack } from "./musicTrack";
 
 // Plays an edit: the live preview in the editor (play, pause, scrub, live music volume) and the
@@ -46,6 +46,54 @@ async function seekTo(v: HTMLVideoElement, time: number) {
   await once(v, "seeked", 1500).catch(() => {});
 }
 
+/**
+ * Measures one frame from 40% into a clip and works out a gentle correction toward a well-exposed, neutral
+ * picture: exposure and contrast (as a canvas filter) and grey-world white balance (as a multiply tint).
+ * Corrections are capped so they fix a dim or blue-ish clip without making skin look artificial.
+ */
+async function measureGrade(v: HTMLVideoElement): Promise<Grade | undefined> {
+  try {
+    const at = Number.isFinite(v.duration) ? v.duration * 0.4 : 0;
+    await seekTo(v, at);
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    g.drawImage(v, 0, 0, 32, 32);
+    const px = g.getImageData(0, 0, 32, 32).data;
+    let r = 0, gr = 0, b = 0, l = 0, l2 = 0;
+    const n = px.length / 4;
+    for (let i = 0; i < px.length; i += 4) {
+      const y = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
+      r += px[i];
+      gr += px[i + 1];
+      b += px[i + 2];
+      l += y;
+      l2 += y * y;
+    }
+    r /= n; gr /= n; b /= n; l /= n;
+    const sd = Math.sqrt(Math.max(0, l2 / n - l * l));
+    if (l < 0.02) return undefined; // a black frame tells us nothing
+    const clampTo = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+    let brightness = clampTo(1 + (0.47 - l) * 0.9, 0.9, 1.25);
+    const contrast = clampTo(1 + (0.2 - sd) * 1.2, 0.97, 1.12);
+    // Half-strength grey world: move each channel halfway toward the average.
+    const avg = (r + gr + b) / 3;
+    const f = [r, gr, b].map((ch) => clampTo(1 + (avg / Math.max(1, ch) - 1) * 0.5, 0.9, 1.1));
+    const top = Math.max(...f);
+    const tintRgb = f.map((x) => x / top);
+    const off = Math.max(...tintRgb.map((x) => 1 - x));
+    let tint: string | null = null;
+    if (off > 0.025) {
+      tint = `rgb(${tintRgb.map((x) => Math.round(x * 255)).join(",")})`;
+      brightness = Math.min(1.3, brightness / ((tintRgb[0] + tintRgb[1] + tintRgb[2]) / 3));
+    }
+    const fix = (x: number) => Math.round(x * 1000) / 1000;
+    return { filter: `brightness(${fix(brightness)}) contrast(${fix(contrast)}) saturate(1.04)`, tint };
+  } catch {
+    return undefined;
+  }
+}
+
 type Mode = "preview" | "record";
 
 export class Engine {
@@ -54,6 +102,7 @@ export class Engine {
   private comp: Compositor | null = null;
   private clips = new Map<string, HTMLVideoElement>();
   private overlays = new Map<string, Media>();
+  private grades = new Map<string, Grade>();
   private loading = new Map<string, Promise<unknown>>();
   private logoLight: HTMLImageElement | null = null;
   private brandmark: HTMLImageElement | null = null;
@@ -111,6 +160,7 @@ export class Engine {
       overlay: (key) => this.overlays.get(key),
       logoLight: scene.brand ? this.logoLight : null,
       brandmark: scene.brand ? this.brandmark : null,
+      grade: (id) => this.grades.get(id),
     });
     this.t = Math.min(this.t, Math.max(0, scene.total - 0.05));
     this.updateMix();
@@ -142,7 +192,12 @@ export class Engine {
       jobs.push(job.catch(() => {}));
     };
     for (const seg of scene.seq) {
-      want(seg.take.id, this.clips, () => loadVideo(seg.take.url, false));
+      want(seg.take.id, this.clips, async () => {
+        const v = await loadVideo(seg.take.url, false);
+        const g = await measureGrade(v);
+        if (g) this.grades.set(seg.take.id, g);
+        return v;
+      });
       for (const ov of seg.overlays) {
         const key = overlayKey(ov);
         if (ov.kind === "segment") want(key, this.overlays, () => loadVideo(ov.from.take.url, true));

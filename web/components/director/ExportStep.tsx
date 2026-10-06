@@ -5,9 +5,10 @@ import { Icon } from "@/components/ds/Icon";
 import type { ChatRequest, ChatResponse } from "@/lib/chat";
 import { buildTimeline, FORMATS, type FormatKey, type Segment, type SpeechAnalysis } from "@/lib/edit";
 import {
-  applyTrims, composeEdit, EXTRAS_MAX, fallbackPlan, normalizePlan, timelineForDirector,
-  type EditPlan, type EditRequest, type EditResponse, type Extra, type Style,
+  applyTrims, composeEdit, EXTRAS_MAX, fallbackPlan, LOOKS, normalizePlan, timelineForDirector,
+  type EditPlan, type EditRequest, type EditResponse, type Extra, type Look, type Style,
 } from "@/lib/editPlan";
+import { toSrt } from "@/lib/srt";
 import { reviseLocally } from "@/lib/revise";
 import { plannedSeconds, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/plan";
 import { exportChecks, scriptText, slug, takeFileName, type Take } from "@/lib/takes";
@@ -52,8 +53,10 @@ type Render =
   | { state: "idle" }
   | { state: "preparing" }
   | { state: "rendering"; progress: number }
-  | { state: "done"; url: string; blob: Blob; mime: string; seconds: number; format: FormatKey }
   | { state: "error"; message: string };
+
+/** A finished file, one per version. */
+type Done = { url: string; blob: Blob; mime: string; seconds: number; format: FormatKey };
 
 export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExported, onPostCaption }: Props) {
   const checks = exportChecks(plan, brief, kept);
@@ -80,12 +83,17 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     return () => clearTimeout(id);
   }, [caption, onPostCaption]);
 
-  // Free the finished video's memory when it's replaced or the page goes away.
-  const doneUrl = render.state === "done" ? render.url : null;
+  const [results, setResults] = useState<Partial<Record<Look, Done>>>({});
+  const done = results[finish.version];
+  // Free the finished videos' memory when the page goes away (a replaced one is freed as it's replaced).
+  const resultsRef = useRef(results);
+  useEffect(() => {
+    resultsRef.current = results;
+  }, [results]);
   useEffect(() => () => {
-    if (doneUrl) URL.revokeObjectURL(doneUrl);
-  }, [doneUrl]);
-  useEffect(() => () => abortRef.current?.abort(), []);
+    abortRef.current?.abort();
+    Object.values(resultsRef.current).forEach((r) => r && URL.revokeObjectURL(r.url));
+  }, []);
 
   const busy = render.state === "preparing" || render.state === "rendering";
   const hookTitle = plan.hooks[hook].line.replace(/^[“"]|[”"]$/g, "");
@@ -144,8 +152,14 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
   };
   const onCaption = useCallback((takeId: string, text: string) => setCaptionEdits((prev) => ({ ...prev, [takeId]: text })), [setCaptionEdits]);
 
-  /** Sends the timeline (and, for a revision, the current edit and feedback) to the Director. */
-  const requestEdit = async (timeline: Segment[], feedback: string, current: EditPlan | null): Promise<{ data: EditResponse; status: number }> => {
+  /** Sends the timeline (and, for a revision, the current edit and feedback) to the Director, for one version. */
+  const requestEdit = async (
+    timeline: Segment[],
+    feedback: string,
+    current: EditPlan | null,
+    look: Look = finish.version,
+  ): Promise<{ data: EditResponse; status: number }> => {
+    const v = finish.versions[look];
     const body: EditRequest = {
       // The Director sees clips as the creator trimmed them.
       timeline: timelineForDirector(applyTrims(timeline, current?.trims ?? []), plan.shots.map((x) => x.title), current && { ...current, trims: [] }),
@@ -158,11 +172,12 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
       platform: brief.platform,
       audience: brief.audience,
       hook: hookTitle,
-      style: finish.style,
+      look,
+      style: v.style,
       music: musicKind,
       current,
       feedback,
-      history: finish.revisions.slice(-6),
+      history: v.revisions.slice(-6),
     };
     try {
       const res = await fetch("/api/edit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -183,27 +198,37 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     return edits;
   };
 
+  /** The Director edits the video twice, in parallel: the Standard version and the Editorial one. */
   const askForEdit = async (): Promise<string> => {
     if (!cut.length) return "Keep at least one take first.";
     const timeline = await currentTimeline();
-    const { data, status } = await requestEdit(timeline, "", null);
-    if ("error" in data) {
-      finish.setEditPlan({ plan: normalizePlan(fallbackPlan(timeline, finish.extras), timeline, finish.extras), signature, source: "builtin" });
-      return `${data.error}${status === 503 ? "" : " Using the built-in edit for now."}`;
-    }
-    const p = normalizePlan(data.plan, timeline, finish.extras);
-    finish.setEditPlan({ plan: p, signature, source: "director" });
-    finish.setStyle(data.style);
-    if (p.captionFixes.length) finish.setCaptionEdits(withFixes(timeline, p));
-    return "";
+    const replies = await Promise.all(LOOKS.map((look) => requestEdit(timeline, "", null, look)));
+    let fixes: EditPlan[] = [];
+    let problem = "";
+    replies.forEach(({ data, status }, i) => {
+      const look = LOOKS[i];
+      if ("error" in data) {
+        const plan = normalizePlan(fallbackPlan(timeline, finish.extras), timeline, finish.extras);
+        finish.update(look, () => ({ editPlan: { plan, signature, source: "builtin" }, revisions: [] }));
+        problem ||= `${data.error}${status === 503 ? "" : " Using the built-in edit for now."}`;
+        return;
+      }
+      const p = normalizePlan(data.plan, timeline, finish.extras);
+      finish.update(look, () => ({ editPlan: { plan: p, signature, source: "director" }, style: data.style, revisions: [] }));
+      if (p.captionFixes.length) fixes = look === finish.version ? [...fixes, p] : [p, ...fixes];
+    });
+    // Caption fixes are shared by both versions; the one on screen has the last word.
+    if (fixes.length) finish.setCaptionEdits(fixes.reduce((edits, p) => ({ ...edits, ...withFixes(timeline, p) }), finish.captionEdits));
+    return problem;
   };
 
   /** After watching the video: re-edit from the creator's feedback, then make the video again. */
   const improve = async (feedback: string): Promise<string> => {
     if (!cut.length) return "Keep at least one take first.";
+    const look = finish.version;
     const timeline = await currentTimeline();
     const current = finish.editPlan && !planStale ? finish.editPlan.plan : normalizePlan(fallbackPlan(timeline, finish.extras), timeline, finish.extras);
-    const { data, status } = await requestEdit(timeline, feedback, current);
+    const { data, status } = await requestEdit(timeline, feedback, current, look);
     let next: EditPlan, style: Style, summary: string, source: "director" | "builtin" | "manual";
     let note = "";
     if ("error" in data) {
@@ -227,14 +252,29 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
       source = "director";
     }
     const edits = withFixes(timeline, next);
-    finish.setEditPlan({ plan: next, signature, source });
-    finish.setStyle(style);
+    finish.update(look, (v) => ({ editPlan: { plan: next, signature, source }, style, revisions: [...v.revisions, { feedback, summary }] }));
     finish.setCaptionEdits(edits);
-    finish.setRevisions((r) => [...r, { feedback, summary }]);
     return note;
   };
 
-  const fileName = (m: string) => `${slug(brief.concept)}-${format.replace(":", "x")}.${m.includes("mp4") ? "mp4" : "webm"}`;
+  const fileName = (m: string, look: Look = finish.version) =>
+    `${slug(brief.concept)}${look === "Editorial" ? "-editorial" : ""}-${format.replace(":", "x")}.${m.includes("mp4") ? "mp4" : "webm"}`;
+
+  /** The edit as it would be exported now, for the version on screen. */
+  const composed = async (edits?: Record<string, string>, plan?: EditPlan) => {
+    const timeline = await currentTimeline(edits);
+    // The Director's edit if it matches these takes; otherwise the built-in one.
+    const chosen = plan ?? (finish.editPlan && !planStale ? finish.editPlan.plan : fallbackPlan(timeline, finish.extras));
+    return composeEdit(timeline, normalizePlan(chosen, timeline, finish.extras, { strict: false }));
+  };
+
+  /** Captions as an SRT file, timed to the finished video. */
+  const downloadSrt = async () => {
+    const edit = await composed();
+    const url = URL.createObjectURL(new Blob([toSrt(edit)], { type: "application/x-subrip" }));
+    download(url, `${slug(brief.concept)}${finish.version === "Editorial" ? "-editorial" : ""}-captions.srt`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   /** Makes the video; `over` carries a fresh revision before its state has landed. */
   const create = async (over: { plan?: EditPlan; style?: Style; edits?: Record<string, string> } = {}) => {
@@ -242,11 +282,9 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setRender({ state: "preparing" });
+    const look = finish.version;
     try {
-      const timeline = await currentTimeline(over.edits);
-      // The Director's edit if it matches these takes; otherwise the built-in one.
-      const chosen = over.plan ?? (finish.editPlan && !planStale ? finish.editPlan.plan : fallbackPlan(timeline, finish.extras));
-      const edit = composeEdit(timeline, normalizePlan(chosen, timeline, finish.extras, { strict: false }));
+      const edit = await composed(over.edits, over.plan);
       const seconds = edit.sequence.reduce((t, x) => t + (x.to - x.from), 0) + (finish.brand ? END_CARD_SECONDS : 0);
       let track: MusicTrack | null = null;
       if (finish.music === "My music") {
@@ -266,7 +304,12 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
         onProgress: (progress) => setRender({ state: "rendering", progress }),
         signal: ctrl.signal,
       });
-      setRender({ state: "done", url: URL.createObjectURL(result.blob), ...result, format });
+      const fresh: Done = { url: URL.createObjectURL(result.blob), ...result, format };
+      setResults((all) => {
+        if (all[look]) URL.revokeObjectURL(all[look].url);
+        return { ...all, [look]: fresh };
+      });
+      setRender({ state: "idle" });
       onExported?.({ blob: result.blob, seconds: result.seconds, format });
     } catch (e) {
       setRender({ state: "error", message: e instanceof Error ? e.message : "Something went wrong while creating your video." });
@@ -274,8 +317,8 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
   };
 
   const share = async () => {
-    if (render.state !== "done") return;
-    const file = new File([render.blob], fileName(render.mime), { type: render.blob.type });
+    if (!done) return;
+    const file = new File([done.blob], fileName(done.mime), { type: done.blob.type });
     try {
       await navigator.share({ files: [file], title: brief.concept, text: caption || undefined });
     } catch {
@@ -283,9 +326,9 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     }
   };
   const canShare =
-    render.state === "done" &&
+    !!done &&
     typeof navigator !== "undefined" &&
-    !!navigator.canShare?.({ files: [new File([render.blob], "v.mp4", { type: render.blob.type })] });
+    !!navigator.canShare?.({ files: [new File([done.blob], "v.mp4", { type: done.blob.type })] });
 
   const writeCaption = async () => {
     setCaptionState("loading");
@@ -332,7 +375,9 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const length = render.state === "done" ? render.seconds : plannedSeconds(plan);
+  const length = done ? done.seconds : plannedSeconds(plan);
+  const other = LOOKS.find((l) => l !== finish.version)!;
+  const otherDone = results[other];
   const exporting = render.state === "rendering" ? render.progress : render.state === "preparing" ? 0 : null;
   const formatChips = (
     <div className={s.stack} style={{ gap: 8 }}>
@@ -344,8 +389,8 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
   /** Making the file: progress, the result, download and share. Shared by the page and the phone editor's sheet. */
   const exportControls = (
     <>
-      {render.state === "done" && (
-        <video key={render.url} className={s.exportResult} src={render.url} controls playsInline style={{ aspectRatio: render.format === "4:5" ? "4 / 5" : "9 / 16" }} />
+      {done && !busy && (
+        <video key={done.url} className={s.exportResult} src={done.url} controls playsInline style={{ aspectRatio: done.format === "4:5" ? "4 / 5" : "9 / 16" }} />
       )}
       {busy && (
         <div className={s.stack} style={{ gap: 6 }} aria-live="polite">
@@ -360,15 +405,23 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
       <div className={s.actions}>
         {busy ? (
           <Button variant="outline" size="lg" onClick={() => abortRef.current?.abort()}>Cancel</Button>
-        ) : render.state === "done" ? (
+        ) : done ? (
           <>
             {canShare && <Button size="lg" icon="share" onClick={share}>Share</Button>}
-            <Button variant={canShare ? "secondary" : "primary"} size="lg" icon="download" onClick={() => download(render.url, fileName(render.mime))}>Download video</Button>
+            <Button variant={canShare ? "secondary" : "primary"} size="lg" icon="download" onClick={() => download(done.url, fileName(done.mime))}>Download video</Button>
             <Button variant="ghost" size="lg" icon="rotate-ccw" onClick={() => create()}>Export again</Button>
           </>
         ) : (
           <Button size="lg" icon="download" onClick={() => create()} disabled={!cut.length || !mime}>
-            Export my video
+            Export the {finish.version} version
+          </Button>
+        )}
+      </div>
+      <div className={s.actions}>
+        <Button variant="ghost" size="sm" icon="download" onClick={downloadSrt} disabled={!cut.length || busy}>Captions (.srt)</Button>
+        {otherDone && !busy && (
+          <Button variant="ghost" size="sm" icon="download" onClick={() => download(otherDone.url, fileName(otherDone.mime, other))}>
+            {other} version
           </Button>
         )}
       </div>
@@ -450,8 +503,8 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
       <div className={s.exportWrap}>
         <div className={s.exportHead}>
           <div className={s.stack} style={{ gap: 10 }}>
-            <Badge tone={render.state === "done" ? "accent" : ready ? "accent" : "warning"} dot={render.state === "done" || ready}>
-              {render.state === "done" ? "Your video is ready" : ready ? "Edit, then export" : "Not ready yet"}
+            <Badge tone={done ? "accent" : ready ? "accent" : "warning"} dot={!!done || ready}>
+              {done ? `${finish.version} version ready` : ready ? "Edit, then export" : "Not ready yet"}
             </Badge>
             <h1 className={s.exportTitle}>{clock(length)} · {cut.length} {cut.length === 1 ? "shot" : "shots"}</h1>
           </div>
@@ -472,13 +525,13 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
               <button type="button" className={s.openEditor} onClick={() => setEditorOpen(true)}>
                 <span className={s.openEditorIcon}><Icon name="play" size={22} /></span>
                 <span className={s.stack} style={{ gap: 2, alignItems: "flex-start" }}>
-                  <span className={s.createTitle}>{render.state === "done" ? "Edit again" : "Open the editor"}</span>
+                  <span className={s.createTitle}>{done ? "Edit again" : "Open the editor"}</span>
                   <span className={s.hint}>Preview, add pictures and text, set the music, then export.</span>
                 </span>
                 <Icon name="chevron-right" size={20} />
               </button>
             )}
-            {render.state === "done" && <div className={s.createCard}>{exportControls}</div>}
+            {done && <div className={s.createCard}>{exportControls}</div>}
           </>
         ) : (
           editor

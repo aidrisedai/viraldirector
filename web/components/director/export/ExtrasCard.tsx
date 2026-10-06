@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Badge } from "@/components/ds/Badge";
 import { Button } from "@/components/ds/Button";
 import { Icon } from "@/components/ds/Icon";
-import { EXTRAS_MAX, NOTES_MAX } from "@/lib/editPlan";
+import { EXTRAS_MAX, NOTES_MAX, type EditPlan } from "@/lib/editPlan";
 import { extraFromFile } from "../render/media";
 import type { ExportState } from "./useExportState";
 import s from "../director.module.css";
@@ -18,8 +18,10 @@ type Props = {
 };
 
 /** Added pictures, clips and notes, and the Director's edit plan that uses them. */
+const cards = (p: EditPlan) => p.callouts.filter((c) => c.style === "card").length;
+
 export function ExtrasCard({ state, onPlan, planStale }: Props) {
-  const { extras, setExtras, notes, setNotes, editPlan } = state;
+  const { extras, setExtras, notes, setNotes, editPlan, version, versions } = state;
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,7 +65,8 @@ export function ExtrasCard({ state, onPlan, planStale }: Props) {
   const p = editPlan?.plan;
   const counts = p && [
     p.cutaways.length && `${p.cutaways.length} cutaway${p.cutaways.length === 1 ? "" : "s"}`,
-    p.callouts.length && `${p.callouts.length} callout${p.callouts.length === 1 ? "" : "s"}`,
+    cards(p) && `${cards(p)} illustrated card${cards(p) === 1 ? "" : "s"}`,
+    p.callouts.length - cards(p) && `${p.callouts.length - cards(p)} callout${p.callouts.length - cards(p) === 1 ? "" : "s"}`,
     p.emphasis.length && `${p.emphasis.length} emphasised word${p.emphasis.length === 1 ? "" : "s"}`,
   ].filter(Boolean).join(" · ");
 
@@ -73,7 +76,8 @@ export function ExtrasCard({ state, onPlan, planStale }: Props) {
         <span className={s.createTitle}>Extra content</span>
         <span className={s.hint}>
           Add screenshots, photos, a logo or extra clips, plus anything you want mentioned. The Director decides where each
-          one goes — over your voice, as a card, or as an on-screen callout.
+          one goes, and makes two versions to choose from: <strong>Standard</strong> (bold captions and callouts) and{" "}
+          <strong>Editorial</strong> (illustrated paper cards, calm captions, a takeaway headline).
         </span>
       </div>
 
@@ -143,7 +147,7 @@ export function ExtrasCard({ state, onPlan, planStale }: Props) {
         <div className={s.planSummary}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Badge tone={planStale ? "warning" : "accent"} dot={!planStale}>
-              {planStale ? "Out of date — your takes changed" : editPlan.source === "director" ? "Director’s edit" : editPlan.source === "manual" ? "Your edit" : "Built-in edit"}
+              {version} · {planStale ? "Out of date — your takes changed" : editPlan.source === "director" ? "Director’s edit" : editPlan.source === "manual" ? "Your edit" : "Built-in edit"}
             </Badge>
             {counts && <span className={s.hint}>{counts}</span>}
           </div>
@@ -154,7 +158,7 @@ export function ExtrasCard({ state, onPlan, planStale }: Props) {
 
       <div className={s.actions}>
         <Button size="md" icon="sparkles" onClick={plan} disabled={busy}>
-          {busy ? "The Director is editing…" : p ? "Ask the Director to edit from scratch" : "Let the Director edit"}
+          {busy ? "The Director is making both versions…" : Object.values(versions).some((v) => v.editPlan) ? "Make both versions again" : "Let the Director make both versions"}
         </Button>
       </div>
     </div>

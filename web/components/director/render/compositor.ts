@@ -1,8 +1,9 @@
 "use client";
 
 import { captionChunks, FORMATS, type FormatKey } from "@/lib/edit";
-import type { ComposedEdit, ComposedSegment, Overlay, Style } from "@/lib/editPlan";
+import { FULL_FRAME, type ComposedEdit, type ComposedSegment, type Overlay, type Style } from "@/lib/editPlan";
 import { clamp01, easeInOut, easeOut, easeOutExpo, spring } from "@/lib/motion";
+import { drawCard, drawLightLeak, drawSticker, drawTakeaway } from "./editorial";
 import { BRAND, CHUNK_WORDS, CREAM, drawCallout, drawCaptions, drawStaggered, drawTitle, titleSeconds, type TextKit, type Word } from "./text";
 
 // Draws any moment of the edit. The live editor preview and the exported file both use this,
@@ -15,8 +16,13 @@ const LOGO_FOR = 2.6;
 export const END_CARD_SECONDS = 3;
 const FADE = 0.15;
 export const TRANSITION = 0.26;
+const SOFT = 0.22;
+const LEAK = 0.6;
 
 export type Media = HTMLVideoElement | HTMLImageElement;
+
+/** A clip's colour correction: a canvas filter (exposure, contrast) and a multiply tint (white balance). */
+export type Grade = { filter: string; tint: string | null };
 
 /** Where the pixels come from: main clips by take, overlays by key, brand marks. */
 export type MediaSource = {
@@ -24,7 +30,12 @@ export type MediaSource = {
   overlay: (key: string) => Media | undefined;
   logoLight: HTMLImageElement | null;
   brandmark: HTMLImageElement | null;
+  /** Colour correction measured for a take, if any. */
+  grade?: (takeId: string) => Grade | undefined;
 };
+
+/** Canvas filters aren't in every browser (Safari); without them clips are drawn as recorded. */
+const canFilter = () => typeof CanvasRenderingContext2D !== "undefined" && "filter" in CanvasRenderingContext2D.prototype;
 
 export const overlayKey = (o: Overlay) => (o.kind === "extra" ? `extra:${o.extraId}` : `shot:${o.from.shot}`);
 
@@ -114,6 +125,16 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
   const { sans, serif } = fontFamilies();
   const style = scene.style;
   const punchy = style.energy === "Punchy";
+  const editorialLook = style.look === "Editorial";
+  const grading = !!style.grade && !!media.grade && canFilter();
+
+  /** Draws a main clip, with its colour correction when that's on. */
+  const cover = (takeId: string, m: Media, scale: number, dx = 0) => {
+    const g = grading ? media.grade!(takeId) : undefined;
+    if (g) ctx.filter = g.filter;
+    drawCover(ctx, m, 0, 0, W, H, scale, dx);
+    if (g) ctx.filter = "none";
+  };
   const kit: TextKit = { ctx, W, H, sans, serif, style, format: scene.format };
   const { logoLight, brandmark } = media;
 
@@ -167,6 +188,13 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
   /** The camera move for segment i: drifts, a punch-in on the hook, jump-cut zooms, emphasis pushes. */
   const cameraScale = (i: number, local: number, into: number, p: number) => {
     const seg = scene.seq[i];
+    if (editorialLook) {
+      // Subtle: most clips sit a touch closer with a slow push; every third is framed wider for variety.
+      let scale = (i % 3 === 2 ? 1 : 1.06) + 0.02 * p;
+      const emph = seg.words.find((w, idx) => seg.emphasis.has(idx) && local >= w.start && local < w.end + 0.6);
+      if (emph) scale *= 1 + 0.045 * easeInOut((local - emph.start) / 0.3) * (1 - easeInOut((local - emph.end - 0.3) / 0.3));
+      return scale;
+    }
     const drift = punchy ? 0.05 : 0.035;
     let scale = i % 2 === 0 ? 1 + drift * p : 1 + drift - drift * p;
     if (i === 0) scale *= 1 + (punchy ? 0.14 : 0.05) * (1 - easeOut(into / 0.5));
@@ -185,6 +213,15 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
     const prev = media.clip(scene.seq[i - 1].take.id);
     if (!v || !prev) return false;
     const q = clamp01(into / TRANSITION);
+    if (style.transition === "Soft") {
+      // A quick, soft crossfade.
+      const prevId = scene.seq[i - 1].take.id;
+      cover(prevId, prev, cameraScale(i - 1, scene.seq[i - 1].to, scene.seq[i - 1].to - scene.seq[i - 1].from, 1));
+      ctx.globalAlpha = easeInOut(clamp01(into / SOFT));
+      cover(scene.seq[i].take.id, v, scale);
+      ctx.globalAlpha = 1;
+      return true;
+    }
     if (style.transition === "Whip") {
       // Old shot flies left, new one arrives from the right, with a smeared motion blur.
       const e = easeInOut(q);
@@ -193,18 +230,19 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
       for (const [m, off] of [[prev, -e * travel], [v, (1 - e) * travel]] as const) {
         // One trailing ghost per shot: enough smear to read as speed, cheap enough for any GPU.
         ctx.globalAlpha = 0.35 * speed;
-        drawCover(ctx, m, 0, 0, W, H, scale, off + W * 0.09 * speed * (m === prev ? 1 : -1));
+        const id = scene.seq[m === prev ? i - 1 : i].take.id;
+        cover(id, m, scale, off + W * 0.09 * speed * (m === prev ? 1 : -1));
         ctx.globalAlpha = 1;
-        drawCover(ctx, m, 0, 0, W, H, scale, off);
+        cover(id, m, scale, off);
       }
       return true;
     }
     if (style.transition === "Zoom") {
       // Old shot rushes toward the viewer and fades; new one settles from a punch-in.
       const e = easeOutExpo(q);
-      drawCover(ctx, v, 0, 0, W, H, scale * (1.35 - 0.35 * e));
+      cover(scene.seq[i].take.id, v, scale * (1.35 - 0.35 * e));
       ctx.globalAlpha = 1 - easeOut(q * 1.4);
-      drawCover(ctx, prev, 0, 0, W, H, 1 + 0.5 * easeInOut(q));
+      cover(scene.seq[i - 1].take.id, prev, 1 + 0.5 * easeInOut(q));
       ctx.globalAlpha = 1;
       return true;
     }
@@ -225,8 +263,17 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
 
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
-    const transitioning = i > 0 && sinceCut < TRANSITION && style.transition !== "Cut" && style.transition !== "Flash";
-    if (!(transitioning && drawTransition(i, sinceCut, scale)) && v) drawCover(ctx, v, 0, 0, W, H, scale);
+    const transitioning = i > 0 && sinceCut < (style.transition === "Soft" ? SOFT : TRANSITION) && style.transition !== "Cut" && style.transition !== "Flash";
+    if (!(transitioning && drawTransition(i, sinceCut, scale)) && v) cover(seg.take.id, v, scale);
+    // White balance: a gentle multiply tint measured for this clip.
+    const tint = grading ? media.grade!(seg.take.id)?.tint : null;
+    if (tint) {
+      ctx.save();
+      ctx.globalCompositeOperation = "multiply";
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
 
     // Cutaways and picture-in-picture over the voice.
     const activeOverlays = seg.overlays.filter((ov) => into >= ov.at && into < ov.at + ov.seconds);
@@ -237,9 +284,22 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
       ctx.fillRect(0, 0, W, H);
     }
 
+    // An occasional gentle light leak on a cut (every third one) in the Soft transition.
+    if (style.transition === "Soft" && i > 0 && i % 3 === 1 && sinceCut < LEAK) drawLightLeak(ctx, W, H, sinceCut / LEAK, i);
+
     activeOverlays.filter((ov) => ov.style === "pip").forEach((ov) => drawOverlay(ov, into));
     const pipUp = activeOverlays.some((ov) => ov.style === "pip");
-    seg.callouts.filter((c) => into >= c.at && into < c.at + c.seconds).forEach((c) => drawCallout(kit, c, into, pipUp));
+    const activeCallouts = seg.callouts.filter((c) => into >= c.at && into < c.at + c.seconds);
+    for (const c of activeCallouts) {
+      if (c.style === "sticker") drawSticker(kit, c, into);
+      else if (!FULL_FRAME.has(c.style)) drawCallout(kit, c, into, pipUp);
+    }
+    // Cards and the takeaway take over the picture (the voice carries on), so they go on top.
+    for (const c of activeCallouts) {
+      if (c.style === "takeaway") drawTakeaway(kit, c, into);
+      else if (c.style === "card") drawCard(kit, c, into, scene.brand ? logoLight : null);
+    }
+    const fullFrame = activeCallouts.some((c) => FULL_FRAME.has(c.style) && into < c.at + c.seconds - 0.12);
 
     drawTitle(kit, scene.title, elapsed, titleTop);
 
@@ -262,7 +322,7 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
     }
 
     // Captions wait for the title to clear.
-    if (elapsed >= scene.titleFor - 0.15) drawCaptions(kit, scene.chunks[i], local, seg.emphasis);
+    if (elapsed >= scene.titleFor - 0.15 && !fullFrame) drawCaptions(kit, scene.chunks[i], local, seg.emphasis);
   };
 
   /** EdAI end card: white brandmark on black, the call to action, and the tagline bottom-centre. */

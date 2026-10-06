@@ -26,11 +26,14 @@ export type TextKit = {
 const SIZE = { S: 0.82, M: 1, L: 1.2 } as const;
 
 /** Words per on-screen caption chunk, per style. */
-export const CHUNK_WORDS: Record<Style["captions"], number> = { Pop: 3, Karaoke: 6, Bold: 2, Minimal: 6, Off: 3 };
+export const CHUNK_WORDS: Record<Style["captions"], number> = { Pop: 3, Karaoke: 6, Bold: 2, Minimal: 6, Editorial: 4, Off: 3 };
 
 export function captionCenterY(k: Pick<TextKit, "H" | "format" | "style">) {
   const tall = k.format === "9:16";
-  return k.H * (k.style.captionPosition === "Lower" ? (tall ? 0.78 : 0.84) : tall ? 0.67 : 0.74);
+  const lower = k.style.captionPosition === "Lower";
+  // Editorial captions sit around chest height, a little below the usual eyeline spot.
+  if (k.style.captions === "Editorial") return k.H * (lower ? (tall ? 0.79 : 0.85) : tall ? 0.71 : 0.77);
+  return k.H * (lower ? (tall ? 0.78 : 0.84) : tall ? 0.67 : 0.74);
 }
 
 const clean = (w: string) => w.replace(/[“”"]/g, "");
@@ -94,6 +97,7 @@ export function drawCaptions(k: TextKit, chunks: Word[][], local: number, emphas
   if (k.style.captions === "Pop") pop(k, chunk, local, emphasis);
   else if (k.style.captions === "Karaoke") karaoke(k, chunk, local, emphasis);
   else if (k.style.captions === "Bold") bold(k, chunk, local, emphasis);
+  else if (k.style.captions === "Editorial") editorial(k, chunk, local, emphasis);
   else minimal(k, chunk, local, emphasis);
   ctx.restore();
 }
@@ -281,6 +285,43 @@ function minimal(k: TextKit, chunk: Word[], local: number, emphasis: Set<number>
     ctx.fillText(words[i], p.x, -blockH / 2 + lh * (p.line + 0.5));
   });
   noShadow(ctx);
+}
+
+/**
+ * Short phrases revealed word by word on a discreet translucent backing; emphasised words get an emerald
+ * strip rather than a bounce. The backing is sized to the whole phrase up front so it never jumps.
+ */
+function editorial(k: TextKit, chunk: Word[], local: number, emphasis: Set<number>) {
+  const { ctx, W } = k;
+  const size = Math.round(W * (k.format === "9:16" ? 0.056 : 0.05) * SIZE[k.style.captionSize]);
+  const words = chunk.map((w) => clean(w.word));
+  ctx.font = `600 ${size}px ${k.sans}`;
+  const gap = size * 0.26;
+  const lay = layout(ctx, words, gap, W * 0.8, 2);
+  const lh = size * 1.3;
+  const blockH = lay.lines.length * lh;
+  const t = local - (chunk[0].start - 0.08);
+  ctx.translate(W / 2, captionCenterY(k));
+  const padX = size * 0.5, padY = size * 0.32;
+  ctx.globalAlpha = clamp01(t / 0.14);
+  ctx.fillStyle = "rgba(11,11,10,.44)";
+  ctx.beginPath();
+  ctx.roundRect(-lay.widest / 2 - padX, -blockH / 2 - padY, lay.widest + padX * 2, blockH + padY * 2, size * 0.28);
+  ctx.fill();
+  chunk.forEach((w, i) => {
+    const p = lay.pos[i];
+    const wt = local - (w.start - 0.04);
+    if (wt < 0) return;
+    const y = -blockH / 2 + lh * (p.line + 0.5);
+    const e = easeOutExpo(wt / 0.22);
+    ctx.globalAlpha = clamp01(wt / 0.1);
+    if (emphasis.has(w.idx)) {
+      ctx.fillStyle = BRAND;
+      ctx.fillRect(p.x - size * 0.12, y - size * 0.56, (p.w + size * 0.24) * easeOutExpo(wt / 0.25), size * 1.1);
+    }
+    ctx.fillStyle = "#fff";
+    ctx.fillText(words[i], p.x, y + (1 - e) * size * 0.18);
+  });
 }
 
 // ---------- Opening title ----------

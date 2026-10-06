@@ -61,6 +61,7 @@
 .pipBlock { background: #6B4FB8; }
 .textBlock { background: #B07A1E; color: #fff; }
 .statBlock { background: var(--brand-accent); }
+.cardBlock { background: #F6F0E2; color: #1A1714; }
 .musicBody { display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: 12px; color: rgba(244, 238, 227, .8); min-width: 0; overflow: hidden; }
 .musicName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 35%; min-width: 0; }
 .musicBody input[type="range"] { flex: 1; accent-color: var(--brand-accent); min-width: 60px; }
@@ -109,6 +110,23 @@
 .seg { display: inline-flex; border: 1px solid rgba(244, 238, 227, .22); border-radius: var(--radius-pill); overflow: hidden; }
 .seg button { border: none; background: transparent; color: #F4EEE3; font: inherit; font-size: 12px; padding: 6px 12px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: #F4EEE3; color: #141413; }
+.segWrap { flex-wrap: wrap; border-radius: 14px; }
+
+/* Standard / Editorial switch */
+.versions { display: inline-flex; align-self: center; gap: 2px; padding: 3px; border-radius: var(--radius-pill); background: rgba(244, 238, 227, .1); }
+.versions button {
+  border: none; background: transparent; color: rgba(244, 238, 227, .75); font: inherit; font-size: 13px; font-weight: 600;
+  padding: 6px 14px; border-radius: var(--radius-pill); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; min-height: 32px;
+}
+.versions button[aria-pressed="true"] { background: #F4EEE3; color: #141413; }
+.fieldLabel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fieldLabel > span { font-size: 12px; font-weight: 600; opacity: .7; }
+/* Phone header: the switch shares the row with close, undo, redo and Export. */
+.mTitle .versions { padding: 2px; }
+.mTitle .versions button { padding: 6px 9px; font-size: 12.5px; min-height: 30px; }
+.mTitle .versionDot { display: none; }
+.versionDot { width: 6px; height: 6px; border-radius: 3px; background: var(--brand-accent); }
+
 .danger { border-color: rgba(229, 72, 77, .5); color: #FFB4B6; }
 
 /* ---------- Phone editor: full screen, swipe to scrub, bottom sheets ---------- */
@@ -118,15 +136,16 @@
   padding-top: env(safe-area-inset-top); -webkit-tap-highlight-color: transparent;
 }
 .mTop { display: flex; align-items: center; gap: 4px; padding: 6px 10px; flex: none; }
-.mTitle { flex: 1; font-weight: 600; font-size: 16px; padding-left: 4px; }
+.mTitle { flex: 1; min-width: 0; font-weight: 600; font-size: 16px; padding-left: 4px; }
 .mIcon {
   width: 40px; height: 40px; border-radius: 20px; border: none; background: transparent; color: inherit;
   display: inline-flex; align-items: center; justify-content: center; font-size: 22px; line-height: 1; cursor: pointer;
 }
 .mIcon:active { background: rgba(244, 238, 227, .12); }
+.mTop .mIcon { width: 36px; flex: none; }
 .mIcon:disabled { opacity: .35; }
 .mExport {
-  margin-left: 6px; height: 36px; padding: 0 18px; border-radius: 18px; border: none; cursor: pointer;
+  flex: none; margin-left: 6px; height: 36px; padding: 0 14px; border-radius: 18px; border: none; cursor: pointer;
   background: var(--brand-accent); color: #fff; font: inherit; font-weight: 600; font-size: 15px;
 }
 .mExport:active { filter: brightness(.92); }

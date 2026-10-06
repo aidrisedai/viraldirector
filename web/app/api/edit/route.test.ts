@@ -21,6 +21,7 @@ const body: EditRequest = {
   platform: "Reels / TikTok",
   audience: "Teens 13–18",
   hook: "Your first business idea is probably bad.",
+  look: "Standard",
   style: DEFAULT_STYLE,
   music: "generated",
   current: PLAN,

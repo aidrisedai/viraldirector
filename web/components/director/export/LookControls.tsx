@@ -13,6 +13,7 @@ const CAPTION_HINT: Record<Style["captions"], string> = {
   Karaoke: "The whole line fills in as you speak.",
   Bold: "One or two huge words slam in.",
   Minimal: "Clean, calm sentence-case lines.",
+  Editorial: "Short phrases revealed word by word on a discreet backing, at chest height.",
   Off: "No captions.",
 };
 
@@ -74,6 +75,15 @@ export function LookControls({ state, hookTitle, disabled, only }: Props) {
           <Chips label="Transition" options={TRANSITIONS} isOn={(c) => c === style.transition} onToggle={(transition) => set({ transition })} />
           <Chips label="Energy" options={ENERGIES} isOn={(c) => c === style.energy} onToggle={(energy) => set({ energy })} />
         </div>
+        {style.transition === "Soft" && <span className={s.hint}>Quick soft crossfades, with a gentle warm light leak now and then.</span>}
+        <span className={s.label}>Colour</span>
+        <Chips
+          label="Colour correction"
+          options={["Auto-correct", "As recorded"] as const}
+          isOn={(c) => (c === "Auto-correct") === style.grade}
+          onToggle={(c) => set({ grade: c === "Auto-correct" })}
+        />
+        <span className={s.hint}>Evens out exposure, contrast and white balance across your clips, gently, so skin stays natural.</span>
       </div>
       )}
 

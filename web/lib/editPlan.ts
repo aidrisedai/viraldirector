@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Segment, TimedWord } from "./edit";
+import { isArt } from "./art";
 import { fitText } from "./plan";
 
 // ---------- Extra content the creator adds ----------
@@ -34,13 +35,29 @@ const CutawaySchema = z.object({
   style: z.enum(["full", "pip"]),
 });
 
+/**
+ * stat: a big number or fact; label: a short tag or heading. The Editorial look adds card: an illustrated
+ * paper card that replaces the picture while the voice continues; takeaway: one huge headline over dimmed,
+ * blurred footage; sticker: a small paper-cutout illustration beside the speaker.
+ */
+export const CALLOUT_STYLES = ["stat", "label", "card", "takeaway", "sticker"] as const;
+export type CalloutStyle = (typeof CALLOUT_STYLES)[number];
+/** Callouts that take over the whole picture (captions step aside while they're up). */
+export const FULL_FRAME: ReadonlySet<CalloutStyle> = new Set(["card", "takeaway"]);
+
 const CalloutSchema = z.object({
   segment: z.number().int().min(0),
   at: z.number().min(0),
   seconds: z.number().positive(),
+  /** The text; for a card, its headline. */
   text: fitText(48),
-  /** stat: a big number or fact; label: a short tag or heading. */
-  style: z.enum(["stat", "label"]),
+  style: z.enum(CALLOUT_STYLES),
+  /** card: the words of the headline set on a highlight strip. */
+  highlight: fitText(48, 0).optional(),
+  /** card: a short supporting phrase under the illustration. */
+  support: fitText(60, 0).optional(),
+  /** card and sticker: which illustration (see lib/art.ts). */
+  art: z.string().max(30).optional(),
 });
 
 export const EditPlanSchema = z.object({
@@ -67,18 +84,24 @@ export const DEFAULT_CTA = "Follow for more";
 
 // ---------- Look of the video (captions, motion, title, music level) ----------
 
-export const CAPTION_STYLES = ["Pop", "Karaoke", "Bold", "Minimal", "Off"] as const;
+export const CAPTION_STYLES = ["Pop", "Karaoke", "Bold", "Minimal", "Editorial", "Off"] as const;
 export const CAPTION_SIZES = ["S", "M", "L"] as const;
 export const CAPTION_POSITIONS = ["Middle", "Lower"] as const;
-export const TRANSITIONS = ["Flash", "Whip", "Zoom", "Cut"] as const;
+export const TRANSITIONS = ["Flash", "Whip", "Zoom", "Soft", "Cut"] as const;
 export const ENERGIES = ["Calm", "Punchy"] as const;
+/** The two ways the Director finishes a video; the creator gets one of each and keeps either. */
+export const LOOKS = ["Standard", "Editorial"] as const;
+export type Look = (typeof LOOKS)[number];
 
 export const StyleSchema = z.object({
-  /** Pop: word-by-word on a sliding pill. Karaoke: the line fills as it's spoken. Bold: one or two huge words slam in. Minimal: clean sentence-case lines. */
+  /**
+   * Pop: word-by-word on a sliding pill. Karaoke: the line fills as it's spoken. Bold: one or two huge words slam in.
+   * Minimal: clean sentence-case lines. Editorial: short phrases revealed word by word on a discreet backing.
+   */
   captions: z.enum(CAPTION_STYLES),
   captionSize: z.enum(CAPTION_SIZES),
   captionPosition: z.enum(CAPTION_POSITIONS),
-  /** How one clip turns into the next. */
+  /** How one clip turns into the next. Soft: a quick crossfade, with an occasional warm light leak. */
   transition: z.enum(TRANSITIONS),
   /** Camera movement: Punchy adds punch-ins and jump-cut zooms; Calm keeps slow drifts. */
   energy: z.enum(ENERGIES),
@@ -87,6 +110,10 @@ export const StyleSchema = z.object({
   showTitle: z.boolean(),
   /** Music level, 0–1. Even at 1 the music stays well under the voice. */
   musicVolume: z.number().min(0).max(1),
+  /** Which version this is (it changes the camera moves and how cards look). */
+  look: z.enum(LOOKS).default("Standard"),
+  /** Even out each clip's exposure, contrast and white balance. */
+  grade: z.boolean().default(false),
 });
 export type Style = z.infer<typeof StyleSchema>;
 
@@ -99,7 +126,25 @@ export const DEFAULT_STYLE: Style = {
   title: "",
   showTitle: true,
   musicVolume: 0.7,
+  look: "Standard",
+  grade: false,
 };
+
+/** The Editorial version's starting look: calm, clean and readable, with the voice leading. */
+export const EDITORIAL_STYLE: Style = {
+  captions: "Editorial",
+  captionSize: "M",
+  captionPosition: "Middle",
+  transition: "Soft",
+  energy: "Calm",
+  title: "",
+  showTitle: false,
+  musicVolume: 0.45,
+  look: "Editorial",
+  grade: true,
+};
+
+export const lookStyle = (look: Look): Style => (look === "Editorial" ? EDITORIAL_STYLE : DEFAULT_STYLE);
 
 const ms = (n: number) => Math.round(n * 1000) / 1000;
 const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
@@ -192,12 +237,20 @@ export function normalizePlan(
     const text = c.text.trim();
     if (!seg || !text) continue;
     const len = segLength(seg);
-    const at = Math.min(Math.max(0, c.at), Math.max(0, len - 1));
-    const seconds = Math.min(Math.max(1, c.seconds), strict ? 4 : 12, len - at);
+    // A card needs time to be read (headline, picture, then the supporting line).
+    const [least, most] = c.style === "card" ? [1.5, 3.5] : c.style === "takeaway" ? [1.2, 3] : [1, 4];
+    const at = Math.min(Math.max(0, c.at), Math.max(0, len - least));
+    const seconds = Math.min(Math.max(least, c.seconds), strict ? most : 12, len - at);
     const windows = perSegment.get(c.segment) ?? [];
     if (seconds < MIN_LEN || (strict && (windows.length >= 2 || windows.some(([x, y]) => at < y && at + seconds > x)))) continue;
     perSegment.set(c.segment, [...windows, [at, at + seconds]]);
-    callouts.push({ ...c, text, at: ms(at), seconds: ms(seconds) });
+    const out: Callout = { segment: c.segment, at: ms(at), seconds: ms(seconds), text, style: c.style };
+    // Only words that are actually in the headline can be highlighted.
+    const highlight = c.highlight?.trim();
+    if (highlight && text.toLowerCase().includes(highlight.toLowerCase())) out.highlight = highlight;
+    if (c.support?.trim()) out.support = c.support.trim();
+    if (c.style === "card" || c.style === "sticker") out.art = c.art && isArt(c.art) ? c.art : "lightbulb";
+    callouts.push(out);
   }
 
   const emphasis = plan.emphasis.filter((e) => timeline[e.segment]?.words.some((w) => norm(w.word) === norm(e.word)));
@@ -334,6 +387,8 @@ export const EditRequestSchema = z.object({
   platform: z.string().max(40),
   audience: z.string().max(40),
   hook: z.string().max(200),
+  /** Which version to make: the standard edit, or the Editorial look with illustrated cards. */
+  look: z.enum(LOOKS).default("Standard"),
   style: StyleSchema,
   music: z.enum(["generated", "custom", "none"]),
   /** For a revision: the edit the creator just watched, and what they want changed. */

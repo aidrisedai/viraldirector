@@ -195,6 +195,20 @@ Rendering is real time (a 45s video takes about 45s) and needs the tab to stay v
   plan — cutaways over the voice (added clips or planned B-roll), picture-in-picture cards, stat/label callouts,
   emphasised caption words, and the end-card call to action. Plans are clamped to the footage before rendering.
   Without the Director, a built-in edit lays B-roll over the voice and places added items on the talking parts.
+- **Two versions: Standard and Editorial** (`lib/directorEdit.ts`, `render/editorial.ts`, `lib/art.ts`). "Let the
+  Director make both versions" asks for two edits in parallel; a Standard / Editorial switch above the preview (in the
+  header on phones) flips between them, each with its own edit, look, feedback history and exported file. Editorial
+  follows the EdAI house style: short Outfit phrases revealed word by word on a discreet backing at chest height, with
+  emerald strips on emphasised words; three or four **illustrated cards** that replace the picture while the voice
+  carries on (warm ivory graph paper, a Libre Baskerville headline with highlighted words, a black engraving-style
+  illustration drawn on in ink from a library of 24, a supporting line; built in layers and held 1.5–3 s); one
+  **takeaway** headline over dimmed, blurred footage; a few **paper-cutout stickers** beside the speaker; soft
+  crossfades with an occasional warm light leak; subtle punch-ins and wider framing; and **automatic colour
+  correction** per clip (exposure, contrast and grey-world white balance, capped so skin stays natural — Chrome, Edge
+  and Firefox; Safari plays clips as recorded). Cards, takeaways and stickers are ordinary Text items in the editor:
+  edit the headline, highlight, supporting line and picture, or move and resize them.
+- **Captions (.srt)** (`lib/srt.ts`): downloads the captions timed to the finished video, in short phrases, for platforms
+  that take a separate caption file.
 - **Look** (`export/LookControls.tsx`): caption style, size and position, transition, energy, the opening title
   (rewrite or hide it), music and its volume, branding. The Director picks these with its edit; the creator can change
   any of them.

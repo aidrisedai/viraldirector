@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Icon } from "@/components/ds/Icon";
 import type { FormatKey, Segment } from "@/lib/edit";
-import { clipBounds, composeEdit, normalizePlan, type EditPlan, type Extra, type Style } from "@/lib/editPlan";
+import { ART, ART_IDS } from "@/lib/art";
+import {
+  CALLOUT_STYLES, clipBounds, composeEdit, LOOKS, normalizePlan, type Callout, type CalloutStyle, type EditPlan, type Extra, type Look, type Style,
+} from "@/lib/editPlan";
 import {
   addCallout, addCutaway, clipWindow, layout, moveCallout, moveCutaway, removeCallout, removeCutaway, resetTrim, roomAt, setTrim,
   toggleDrop, toVideoTime, updateCallout, updateCutaway,
@@ -20,6 +23,74 @@ function Thumb({ url, kind, className }: { url: string; kind: "image" | "video";
   const src = useThumb(url, kind);
   // eslint-disable-next-line @next/next/no-img-element -- local blob / data preview
   return src ? <img className={className} src={src} alt="" draggable={false} /> : <span className={className} />;
+}
+
+const CALLOUT_NAMES: Record<CalloutStyle, string> = { label: "Label", stat: "Big number", card: "Card", takeaway: "Takeaway", sticker: "Sticker" };
+const CALLOUT_HINTS: Record<CalloutStyle, string> = {
+  label: "A short tag over the video.",
+  stat: "Big numbers count up on screen — try “200 users”.",
+  card: "An illustrated paper card replaces the picture while you keep talking. Hold it 1.5–3 s so people can read it.",
+  takeaway: "One huge headline over dimmed, blurred footage. Save it for your main point.",
+  sticker: "A small paper-cutout picture beside you, away from your face.",
+};
+const BLOCK_ICON: Record<CalloutStyle, Parameters<typeof Icon>[0]["name"]> = { label: "type", stat: "type", card: "image-plus", takeaway: "zap", sticker: "sparkles" };
+
+/** Text, kind and (for cards and stickers) picture of an on-screen text item. Shared by the inspector and the phone sheet. */
+function CalloutFields({ c, phone, onLive, onCommit, onDone }: {
+  c: Callout;
+  phone: boolean;
+  /** Typing: updates the preview without an undo step per letter. */
+  onLive: (patch: Partial<Callout>) => void;
+  onCommit: (patch: Partial<Callout>) => void;
+  onDone?: () => void;
+}) {
+  const field = phone ? e.mField : e.field;
+  const text = (label: string, key: "text" | "highlight" | "support", max: number, placeholder = "") => (
+    <label className={e.fieldLabel}>
+      <span>{label}</span>
+      <input
+      className={field}
+      aria-label={label}
+      placeholder={placeholder || label}
+      maxLength={max}
+      value={(key === "text" ? c.text : c[key]) ?? ""}
+      autoFocus={key === "text" && c.text === "Your text"}
+      onFocus={(ev) => key === "text" && c.text === "Your text" && ev.currentTarget.select()}
+      onChange={(ev) => onLive(key === "text" ? { text: ev.target.value || " " } : { [key]: ev.target.value })}
+      enterKeyHint="done"
+      onKeyDown={(ev) => ev.key === "Enter" && onDone?.()}
+      />
+    </label>
+  );
+  const hasArt = c.style === "card" || c.style === "sticker";
+  return (
+    <>
+      {text(c.style === "card" ? "Headline" : c.style === "sticker" ? "Label under the picture" : "On-screen text", "text", 48)}
+      <div className={`${e.seg} ${e.segWrap}`} role="group" aria-label="Text style">
+        {CALLOUT_STYLES.map((st) => (
+          <button
+            key={st}
+            type="button"
+            aria-pressed={c.style === st}
+            onClick={() => onCommit({ style: st, ...((st === "card" || st === "sticker") && !c.art ? { art: "lightbulb" } : {}) })}
+          >
+            {CALLOUT_NAMES[st]}
+          </button>
+        ))}
+      </div>
+      {c.style === "card" && text("Words to highlight", "highlight", 48, "Copy them from the headline")}
+      {c.style === "card" && text("Supporting line", "support", 60, "A short line under the picture")}
+      {hasArt && (
+        <label className={e.fieldLabel}>
+          <span>Picture</span>
+          <select className={field} aria-label="Picture" value={c.art ?? "lightbulb"} onChange={(ev) => onCommit({ art: ev.target.value })}>
+            {ART_IDS.map((id) => <option key={id} value={id}>{ART[id].label}</option>)}
+          </select>
+        </label>
+      )}
+      <p className={phone ? e.mSheetHint : e.hint}>{CALLOUT_HINTS[c.style]}</p>
+    </>
+  );
 }
 
 type Selection = { kind: "cutaway" | "callout"; index: number } | { kind: "clip"; segment: number } | null;
@@ -98,6 +169,27 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
     zoomRef.current = zoom;
   }, [zoom]);
   const syncHistory = () => setHistory({ past: past.current.length, future: future.current.length });
+
+  /** Shows the other version. Undo history belongs to one version, so it starts afresh. */
+  const switchVersion = (v: Look) => {
+    if (v === state.version) return;
+    engineRef.current?.pause();
+    past.current = [];
+    future.current = [];
+    syncHistory();
+    setSelected(null);
+    state.setVersion(v);
+  };
+  const versionTabs = (
+    <div className={e.versions} role="group" aria-label="Version">
+      {LOOKS.map((v) => (
+        <button key={v} type="button" aria-pressed={state.version === v} onClick={() => switchVersion(v)}>
+          {v}
+          {state.versions[v].editPlan?.source === "director" && <span className={e.versionDot} aria-label="edited by the Director" />}
+        </button>
+      ))}
+    </div>
+  );
 
   // ---------- engine ----------
   const placePlayhead = useCallback(() => {
@@ -582,7 +674,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
       <section className={e.m} aria-label="Video editor">
         <header className={e.mTop}>
           <button type="button" className={e.mIcon} onClick={onClose} aria-label="Close editor"><Icon name="x" size={20} /></button>
-          <span className={e.mTitle}>Edit</span>
+          <span className={e.mTitle}>{versionTabs}</span>
           <button type="button" className={e.mIcon} onClick={undo} disabled={!history.past} aria-label="Undo"><Icon name="undo" size={18} /></button>
           <button type="button" className={e.mIcon} onClick={redo} disabled={!history.future} aria-label="Redo"><Icon name="redo" size={18} /></button>
           <button type="button" className={e.mExport} onClick={() => openSheet("export")}>Export</button>
@@ -676,7 +768,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                   return (
                     <div
                       key={`${c.text}-${i}`}
-                      className={`${e.mBlock} ${e.textBlock} ${c.style === "stat" ? e.statBlock : ""} ${on ? `${e.blockSel} ${e.mGrab}` : ""}`}
+                      className={`${e.mBlock} ${e.textBlock} ${c.style === "stat" ? e.statBlock : ""} ${c.style === "card" || c.style === "takeaway" ? e.cardBlock : ""} ${on ? `${e.blockSel} ${e.mGrab}` : ""}`}
                       style={{ left: x(pos.start), width: Math.max(10, pos.seconds * pps) }}
                       onPointerDown={on ? (ev) => startBlock(ev, "callout", i, "move", at, c.seconds) : undefined}
                       onClick={() => {
@@ -684,7 +776,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                         setSelected({ kind: "callout", index: i });
                       }}
                     >
-                      <Icon name="type" size={12} /> {c.text}
+                      <Icon name={BLOCK_ICON[c.style]} size={12} /> {c.text}
                       {on && <span className={e.mHandle} onPointerDown={(ev) => startBlock(ev, "callout", i, "resize", at, c.seconds)} />}
                     </div>
                   );
@@ -719,9 +811,11 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
           ) : selCallout && sel?.kind === "callout" && lay ? (
             <>
               <button type="button" className={e.mTool} onClick={() => openSheet("text")}><Icon name="pencil" size={20} />Edit</button>
-              <button type="button" className={e.mTool} onClick={() => commit(updateCallout(plan!, sel.index, { style: selCallout.style === "stat" ? "label" : "stat" }))}>
-                <Icon name="type" size={20} />{selCallout.style === "stat" ? "Label" : "Number"}
-              </button>
+              {(selCallout.style === "stat" || selCallout.style === "label") && (
+                <button type="button" className={e.mTool} onClick={() => commit(updateCallout(plan!, sel.index, { style: selCallout.style === "stat" ? "label" : "stat" }))}>
+                  <Icon name="type" size={20} />{selCallout.style === "stat" ? "Label" : "Number"}
+                </button>
+              )}
               <button type="button" className={e.mTool} onClick={() => commit(updateCallout(plan!, sel.index, { seconds: step(-1)(selCallout.seconds) }))}>
                 <span className={e.mToolGlyph}>−</span>Shorter
               </button>
@@ -802,22 +896,13 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                 )}
                 {sheet === "text" && selCallout && sel?.kind === "callout" && (
                   <div className={e.mForm}>
-                    <input
-                      className={e.mField}
-                      aria-label="On-screen text"
-                      maxLength={48}
-                      value={selCallout.text}
-                      autoFocus
-                      onFocus={(ev) => selCallout.text === "Your text" && ev.currentTarget.select()}
-                      onChange={(ev) => onPlan(updateCallout(plan!, sel.index, { text: ev.target.value || " " }))}
-                      enterKeyHint="done"
-                      onKeyDown={(ev) => ev.key === "Enter" && setSheet(null)}
+                    <CalloutFields
+                      c={selCallout}
+                      phone
+                      onLive={(patch) => onPlan(updateCallout(plan!, sel.index, patch))}
+                      onCommit={(patch) => commit(updateCallout(plan!, sel.index, patch))}
+                      onDone={() => setSheet(null)}
                     />
-                    <div className={e.seg} role="group" aria-label="Text style">
-                      <button type="button" aria-pressed={selCallout.style === "label"} onClick={() => commit(updateCallout(plan!, sel.index, { style: "label" }))}>Label</button>
-                      <button type="button" aria-pressed={selCallout.style === "stat"} onClick={() => commit(updateCallout(plan!, sel.index, { style: "stat" }))}>Big number</button>
-                    </div>
-                    <p className={e.mSheetHint}>Big numbers count up on screen — try “200 users”.</p>
                   </div>
                 )}
                 {sheet === "text" && !selCallout && <p className={e.mSheetHint}>No room for text here — move the playhead onto a clip.</p>}
@@ -850,6 +935,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
   return (
     <section className={e.editor} aria-label="Video editor">
       <div className={e.stage}>
+        {versionTabs}
         <div className={e.screen} style={{ aspectRatio: format === "4:5" ? "4 / 5" : "9 / 16" }}>
           <canvas ref={canvasRef} aria-label="Preview of your video" onClick={toggle} />
           {!ready && <div className={e.screenNote}>Lining up your clips…</div>}
@@ -977,11 +1063,11 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                 return (
                   <div
                     key={`${c.text}-${i}`}
-                    className={`${e.block} ${e.textBlock} ${c.style === "stat" ? e.statBlock : ""} ${sel?.kind === "callout" && sel.index === i ? e.blockSel : ""}`}
+                    className={`${e.block} ${e.textBlock} ${c.style === "stat" ? e.statBlock : ""} ${c.style === "card" || c.style === "takeaway" ? e.cardBlock : ""} ${sel?.kind === "callout" && sel.index === i ? e.blockSel : ""}`}
                     style={{ left: pos.start * pps, width: Math.max(8, pos.seconds * pps) }}
                     onPointerDown={(ev) => startBlock(ev, "callout", i, "move", at, c.seconds)}
                   >
-                    <Icon name="type" size={12} /> {c.text}
+                    <Icon name={BLOCK_ICON[c.style]} size={12} /> {c.style === "card" ? "Card · " : ""}{c.text}
                     <span className={e.handle} onPointerDown={(ev) => startBlock(ev, "callout", i, "resize", at, c.seconds)} />
                   </div>
                 );
@@ -1066,20 +1152,13 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
             </>
           ) : selCallout && sel?.kind === "callout" && lay ? (
             <>
-              <input
-                className={e.field}
-                aria-label="On-screen text"
-                maxLength={48}
-                value={selCallout.text}
-                autoFocus={selCallout.text === "Your text"}
-                onFocus={(ev) => selCallout.text === "Your text" && ev.currentTarget.select()}
-                onChange={(ev) => onPlan(updateCallout(plan!, sel.index, { text: ev.target.value || " " }))}
+              <CalloutFields
+                c={selCallout}
+                phone={false}
+                onLive={(patch) => onPlan(updateCallout(plan!, sel.index, patch))}
+                onCommit={(patch) => commit(updateCallout(plan!, sel.index, patch))}
               />
               <div className={e.inspectorRow}>
-                <div className={e.seg} role="group" aria-label="Text style">
-                  <button type="button" aria-pressed={selCallout.style === "label"} onClick={() => commit(updateCallout(plan!, sel.index, { style: "label" }))}>Label</button>
-                  <button type="button" aria-pressed={selCallout.style === "stat"} onClick={() => commit(updateCallout(plan!, sel.index, { style: "stat" }))}>Big number</button>
-                </div>
                 <label className={e.inspectorRow} style={{ gap: 6 }}>
                   Seconds
                   <input

@@ -112,3 +112,26 @@ describe("timelineForDirector", () => {
     expect(t[1].words[0]).toEqual({ word: "Bad", start: 0.1, end: 0.5 });
   });
 });
+
+describe("Editorial callouts", () => {
+  it("keeps a card's picture, supporting line and only a highlight that's in the headline", () => {
+    const plan = normalizePlan(
+      {
+        ...empty,
+        callouts: [
+          { segment: 1, at: 1, seconds: 1, text: "Bad ideas teach you", style: "card", highlight: "teach you", support: "Ship to learn", art: "book" },
+          { segment: 3, at: 1, seconds: 2, text: "Ship it", style: "card", highlight: "not there", support: "", art: "unicorn" },
+          { segment: 1, at: 5, seconds: 2, text: "Start building", style: "takeaway", highlight: "", support: "", art: "" },
+        ],
+      },
+      timeline,
+      [],
+    );
+    const [first, takeaway, second] = plan.callouts.sort((a, b) => a.segment - b.segment || a.at - b.at);
+    // A card is held long enough to read.
+    expect(first).toEqual({ segment: 1, at: 1, seconds: 1.5, text: "Bad ideas teach you", style: "card", highlight: "teach you", support: "Ship to learn", art: "book" });
+    expect(takeaway).toEqual({ segment: 1, at: 5, seconds: 2, text: "Start building", style: "takeaway" });
+    // An unknown picture falls back to one that exists; a highlight not in the headline is dropped.
+    expect(second).toEqual({ segment: 3, at: 1, seconds: 2, text: "Ship it", style: "card", art: "lightbulb" });
+  });
+});

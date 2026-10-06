@@ -1,9 +1,10 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { ART, ART_IDS } from "./art";
 import { callDirector, DirectorError, responseText } from "./director";
 import {
-  CAPTION_POSITIONS, CAPTION_SIZES, CAPTION_STYLES, EditPlanSchema, ENERGIES, StyleSchema, TRANSITIONS,
+  CALLOUT_STYLES, CAPTION_POSITIONS, CAPTION_SIZES, CAPTION_STYLES, EditPlanSchema, ENERGIES, StyleSchema, TRANSITIONS,
   type EditPlan, type EditRequest, type Style,
 } from "./editPlan";
 
@@ -11,17 +12,17 @@ const SYSTEM = `You are the Director in ViralDirector, now acting as the editor.
 
 The edit plan:
 - cutaways: put something over the creator's voice while they keep talking. Source "shot:<n>" lays a planned B-roll, insert or screen-recording shot over a talking segment (its own clip then leaves the sequence). Source "extra:<id>" uses content the creator added. style "full" replaces the picture; "pip" shows it as a card over the speaker (best for screenshots, photos, logos). Cut to cutaways on the words they illustrate — use the word timings.
-- callouts: short animated on-screen text. "stat" for a number or fact ("4th idea", "200 users" — numbers count up on screen), "label" for a 1–4 word tag ("The point", "Step 2"). Max 48 characters, at most two per segment, never repeating the caption word for word.
+- callouts: short animated on-screen text. "stat" for a number or fact ("4th idea", "200 users" — numbers count up on screen), "label" for a 1–4 word tag ("The point", "Step 2"). Max 48 characters, at most two per segment, never repeating the caption word for word. The "card", "takeaway" and "sticker" styles belong to the Editorial version only (see below); outside it, set highlight, support and art to "".
 - emphasis: words in the captions to make pop (the payoff number, the surprising word). A few per video, not one per line.
 - drop: segments to leave out entirely (a weak reaction shot, a duplicate line). Usually empty.
-- captionFixes: corrected caption text for a speaking segment, only when the creator says a caption is wrong or the words clearly don't match. Write exactly what was said.
+- captionFixes: corrected caption text for a speaking segment, only when the creator says a caption is wrong or the words clearly don't match. Write exactly what was said. Check names, numbers and technical terms against the concept and hook; if you're unsure of a word, don't guess — end the summary with "Check: …" naming the words for the creator to confirm.
 - endCta: one short call to action for the end card, under 60 characters.
 - summary: one or two plain sentences telling the creator what you did and why. In a revision, say exactly what you changed.
 
 The style:
-- captions: "Pop" (word by word on a sliding emerald pill — energetic, the default), "Karaoke" (the line fills in as it's spoken — good for longer, story-driven lines), "Bold" (one or two huge words slam in — maximum energy, hype and punchy claims), "Minimal" (clean sentence-case lines — calm, premium, LinkedIn), "Off".
+- captions: "Pop" (word by word on a sliding emerald pill — energetic, the default), "Karaoke" (the line fills in as it's spoken — good for longer, story-driven lines), "Bold" (one or two huge words slam in — maximum energy, hype and punchy claims), "Minimal" (clean sentence-case lines — calm, premium, LinkedIn), "Editorial" (short phrases revealed word by word on a discreet backing — the Editorial version), "Off".
 - captionSize: "S" | "M" | "L". captionPosition: "Middle" (default, in the viewer's eyeline) | "Lower" (when captions cover a face or a screenshot).
-- transition between clips: "Flash" | "Whip" (fast and modern) | "Zoom" (punchy) | "Cut" (clean, calm).
+- transition between clips: "Flash" | "Whip" (fast and modern) | "Zoom" (punchy) | "Soft" (quick crossfades with an occasional warm light leak — editorial) | "Cut" (clean, calm).
 - energy: "Punchy" (punch-ins, jump-cut zooms) | "Calm" (slow drifts only).
 - title: the animated text over the opening — at most 8 words, ideally fewer than the spoken hook; "" keeps the hook. showTitle: false hides it.
 - musicVolume 0–1 (default 0.7). The app always keeps music well under the voice; lower it if the creator finds it distracting, raise it only if they ask.
@@ -35,7 +36,33 @@ Rules:
 - Voice: warm, confident, specific, builder-focused. Say build, launch, ship — not learn or classes. No emoji, no hashtags, no exclamation marks in callouts.
 - If brand is on, the end card says "Raising Principled and Ambitious Teens as Builders and Founders" already; make endCta an action (for example "Follow for more builder stories").
 
+The <version> tag says which version to make. "Standard" is everything above, with stat and label callouts only.
+
 Revisions: when <feedback> is present, the creator has watched the video made from <current> and the current style, and wants changes. Start from <current> and the current style and change what the feedback asks for or clearly implies — keep everything else exactly as it was, so the video doesn't change in ways they didn't ask for. Interpret loose words generously ("more exciting" → Bold or Pop, Punchy, Whip, a callout or two; "too busy" → fewer callouts and cutaways, Calm, Minimal; "music is distracting" → lower musicVolume). If they ask for something only a reshoot can fix (what they said, how they look, the lighting), say so in the summary and name the shot to retake.`;
+
+/** The creator's house style for the Editorial version, turned into what this editor can do. */
+const EDITORIAL = `<editorial_version>
+This is the Editorial version: a calm, premium explainer that keeps the creator's voice in charge and illustrates the key ideas.
+
+Story and pacing: preserve the creator's voice, meaning and factual claims. Leave out segments with mistakes or repeated lines (drop). Keep the pace energetic but easy to follow, and time every visual change to a meaningful word or a change of thought, using the word timings.
+
+Captions: style.captions "Editorial" (short phrases of two to five words, revealed word by word on a discreet translucent backing around chest height, Outfit type). Pick only a few emphasis words — the payoff, a key number, a surprising word — which get a highlight strip rather than bouncing.
+
+Graphic cards: callouts with style "card". At the important explanatory moments the picture is replaced by an illustrated card — warm ivory graph paper, a black vintage engraving-style illustration, the EdAI palette — while the voice continues. The card animates in layers: headline, then illustration, then the supporting phrase.
+- text: the headline, at most 6 words (it's set large in Libre Baskerville).
+- highlight: the 1–3 words of the headline set on a contrasting strip (copy them exactly from text).
+- support: a short supporting phrase, at most 7 words, that adds to the headline rather than repeating it.
+- art: one illustration id that works as a visual metaphor that genuinely explains the words. Don't reuse one, and don't default to the same few. Available: ${ART_IDS.map((id) => `${id} (${ART[id].label.toLowerCase()})`).join(", ")}.
+- Hold each card 1.5–3 seconds, long enough to read. For a roughly 40-second video use about three or four cards (fewer for shorter videos), never in the first two seconds and never back to back.
+
+Supporting motion: two or three callouts with style "sticker" at most — a small paper-cutout illustration with a soft shadow beside the speaker, away from the face, with a 1–2 word label as text and an art id; 1.5–2.5 seconds. Added pictures and clips still go in cutaways.
+
+The takeaway: exactly one callout with style "takeaway" on the strongest takeaway — 1–3 huge words (like "START BUILDING") over briefly dimmed and blurred footage, 1.5–2.5 seconds, near the end but before the call to action.
+
+Style: captions "Editorial", transition "Soft" (clean cuts, quick soft crossfades and an occasional gentle light leak), energy "Calm" (the app adds subtle punch-ins on emphasis words and occasional wider framing), showTitle false unless the hook truly needs a title, musicVolume 0.3–0.5 so the voice stays clear and dominant. No "stat" or "label" callouts in this version.
+
+Honesty: never invent dialogue, and never imply that illustrative graphics are footage of real outcomes — card text states the creator's own points. endCta is one clear call to action that fits the footage and the brief.
+</editorial_version>`;
 
 const str = { type: "string" } as const;
 const num = { type: "number" } as const;
@@ -64,8 +91,11 @@ const EDIT_JSON_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["segment", "at", "seconds", "text", "style"],
-        properties: { segment: int, at: num, seconds: num, text: str, style: { type: "string", enum: ["stat", "label"] } },
+        required: ["segment", "at", "seconds", "text", "style", "highlight", "support", "art"],
+        properties: {
+          segment: int, at: num, seconds: num, text: str, style: { type: "string", enum: [...CALLOUT_STYLES] },
+          highlight: str, support: str, art: { type: "string", enum: ["", ...ART_IDS] },
+        },
       },
     },
     emphasis: {
@@ -113,7 +143,7 @@ export async function planEdit(req: EditRequest): Promise<{ plan: EditPlan; styl
     creatorNotes: req.notes || "(none)",
     currentStyle: req.style,
   };
-  const parts = [`<video>\n${JSON.stringify(brief, null, 1)}\n</video>`];
+  const parts = [`<version>${req.look}</version>`, `<video>\n${JSON.stringify(brief, null, 1)}\n</video>`];
   if (req.feedback) {
     if (req.current) parts.push(`<current>\n${JSON.stringify(req.current)}\n</current>`);
     if (req.history.length) {
@@ -130,7 +160,7 @@ export async function planEdit(req: EditRequest): Promise<{ plan: EditPlan; styl
     {
       max_tokens: 16000,
       output_config: { effort: "medium", format: { type: "json_schema", schema: EDIT_JSON_SCHEMA } },
-      system: SYSTEM,
+      system: req.look === "Editorial" ? `${SYSTEM}\n\n${EDITORIAL}` : SYSTEM,
       messages: [{ role: "user", content }],
     },
     req.feedback ? "revise the edit" : "plan the edit",
@@ -148,5 +178,6 @@ export async function planEdit(req: EditRequest): Promise<{ plan: EditPlan; styl
     throw new DirectorError("The Director’s edit came back incomplete. Try again.", 502);
   }
   const { style, ...plan } = parsed.data;
-  return { plan, style };
+  // The version is the creator's choice, not the Director's; colour correction is on for Editorial unless they turned it off.
+  return { plan, style: { ...style, look: req.look, grade: req.feedback ? req.style.grade : req.look === "Editorial" } };
 }
