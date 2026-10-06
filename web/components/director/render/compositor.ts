@@ -3,6 +3,7 @@
 import { captionChunks, FORMATS, type FormatKey } from "@/lib/edit";
 import { FULL_FRAME, type ComposedEdit, type ComposedSegment, type Overlay, type Style } from "@/lib/editPlan";
 import { clamp01, easeInOut, easeOut, easeOutExpo, spring } from "@/lib/motion";
+import { CINEMATIC_FILTER, drawEndTitle, drawHeadline, drawPaleFlash, drawPanels, drawVignette } from "./cinematic";
 import { drawCard, drawLightLeak, drawSticker, drawTakeaway } from "./editorial";
 import { BRAND, CHUNK_WORDS, CREAM, drawCallout, drawCaptions, drawStaggered, drawTitle, titleSeconds, type TextKit, type Word } from "./text";
 
@@ -49,6 +50,8 @@ export type Scene = {
   chunks: Word[][][];
   style: Style;
   brand: boolean;
+  /** The EdAI end card (Cinematic ends on its own closing title instead). */
+  endCard: boolean;
   title: string;
   titleFor: number;
   endCta: string;
@@ -68,10 +71,11 @@ export function buildScene(edit: ComposedEdit, style: Style, brand: boolean, hoo
     seq,
     starts,
     seqSeconds: t,
-    total: t + (brand ? END_CARD_SECONDS : 0),
+    total: t + (brand && style.look !== "Cinematic" ? END_CARD_SECONDS : 0),
     chunks: seq.map((s) => captionChunks(s.words.map((w, idx) => ({ ...w, idx })), CHUNK_WORDS[style.captions]) as Word[][]),
     style,
     brand,
+    endCard: brand && style.look !== "Cinematic",
     title,
     titleFor: title ? titleSeconds(title) : 0,
     endCta: edit.endCta,
@@ -125,15 +129,19 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
   const { sans, serif } = fontFamilies();
   const style = scene.style;
   const punchy = style.energy === "Punchy";
-  const editorialLook = style.look === "Editorial";
-  const grading = !!style.grade && !!media.grade && canFilter();
+  const cinematic = style.look === "Cinematic";
+  const editorialLook = style.look === "Editorial" || cinematic;
+  const grading = !!style.grade && canFilter();
+  const warmTakes = new Set(scene.seq.filter((x) => x.warm).map((x) => x.take.id));
 
-  /** Draws a main clip, with its colour correction when that's on. */
+  /** Draws a main clip, with its colour correction (and the Cinematic grade) when that's on. */
   const cover = (takeId: string, m: Media, scale: number, dx = 0) => {
-    const g = grading ? media.grade!(takeId) : undefined;
-    if (g) ctx.filter = g.filter;
+    const g = grading ? media.grade?.(takeId) : undefined;
+    const look = grading && cinematic ? (warmTakes.has(takeId) ? CINEMATIC_FILTER.warm : CINEMATIC_FILTER.dark) : "";
+    const filter = [g?.filter, look].filter(Boolean).join(" ");
+    if (filter) ctx.filter = filter;
     drawCover(ctx, m, 0, 0, W, H, scale, dx);
-    if (g) ctx.filter = "none";
+    if (filter) ctx.filter = "none";
   };
   const kit: TextKit = { ctx, W, H, sans, serif, style, format: scene.format };
   const { logoLight, brandmark } = media;
@@ -279,6 +287,17 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
     const activeOverlays = seg.overlays.filter((ov) => into >= ov.at && into < ov.at + ov.seconds);
     activeOverlays.filter((ov) => ov.style === "full").forEach((ov) => drawOverlay(ov, into));
 
+    // Cinematic: the dark build gets a vignette; a pale flash cuts into the warm payoff.
+    if (cinematic && !seg.warm) drawVignette(ctx, W, H);
+    if (cinematic && seg.warm && i > 0 && !scene.seq[i - 1].warm) drawPaleFlash(ctx, W, H, sinceCut);
+
+    // Panels: up to three pictures stacked in the frame.
+    const panelUp = activeOverlays.filter((ov) => ov.style === "panel");
+    drawPanels(ctx, W, H, panelUp.flatMap((ov) => {
+      const m = media.overlay(overlayKey(ov));
+      return m ? [{ m, t: into - ov.at, seconds: ov.seconds }] : [];
+    }));
+
     if (style.transition === "Flash" && i > 0 && sinceCut < 0.14) {
       ctx.fillStyle = `rgba(255,255,255,${0.4 * (1 - sinceCut / 0.14)})`;
       ctx.fillRect(0, 0, W, H);
@@ -292,6 +311,8 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
     const activeCallouts = seg.callouts.filter((c) => into >= c.at && into < c.at + c.seconds);
     for (const c of activeCallouts) {
       if (c.style === "sticker") drawSticker(kit, c, into);
+      else if (c.style === "headline") drawHeadline(kit, c, into);
+      else if (c.style === "title") drawEndTitle(kit, c, into, scene.brand ? logoLight : null);
       else if (!FULL_FRAME.has(c.style)) drawCallout(kit, c, into, pipUp);
     }
     // Cards and the takeaway take over the picture (the voice carries on), so they go on top.
@@ -299,12 +320,12 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
       if (c.style === "takeaway") drawTakeaway(kit, c, into);
       else if (c.style === "card") drawCard(kit, c, into, scene.brand ? logoLight : null);
     }
-    const fullFrame = activeCallouts.some((c) => FULL_FRAME.has(c.style) && into < c.at + c.seconds - 0.12);
+    const fullFrame = activeCallouts.some((c) => (FULL_FRAME.has(c.style) || c.style === "title") && into < c.at + c.seconds - 0.12);
 
     drawTitle(kit, scene.title, elapsed, titleTop);
 
     // EdAI logo in a protected panel, top-left, over the opening (above the title scrim).
-    if (logoLight && elapsed < logoFor) {
+    if (logoLight && elapsed < logoFor && !cinematic) {
       const a = Math.min(easeOut((elapsed - 0.1) / 0.35), clamp01((logoFor - elapsed) / 0.3));
       const slide = (1 - easeOutExpo((elapsed - 0.1) / 0.5)) * -margin;
       ctx.save();
@@ -322,7 +343,9 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
     }
 
     // Captions wait for the title to clear.
-    if (elapsed >= scene.titleFor - 0.15 && !fullFrame) drawCaptions(kit, scene.chunks[i], local, seg.emphasis);
+    // Smaller captions in the payoff, so the human moment comes first.
+    const capKit = seg.warm ? { ...kit, style: { ...style, captionSize: "S" as const } } : kit;
+    if (elapsed >= scene.titleFor - 0.15 && !fullFrame) drawCaptions(capKit, scene.chunks[i], local, seg.emphasis);
   };
 
   /** EdAI end card: white brandmark on black, the call to action, and the tagline bottom-centre. */
@@ -366,7 +389,7 @@ export function makeCompositor(ctx: CanvasRenderingContext2D, scene: Scene, medi
 
   /** Draws whatever is on screen at time t (paused or scrubbing). */
   const drawAt = (t: number) => {
-    if (t >= scene.seqSeconds && scene.brand) return drawEndCard(t - scene.seqSeconds);
+    if (t >= scene.seqSeconds && scene.endCard) return drawEndCard(t - scene.seqSeconds);
     const i = segmentAt(scene, t);
     const seg = scene.seq[i];
     const local = Math.min(seg.to, seg.from + Math.max(0, t - scene.starts[i]));

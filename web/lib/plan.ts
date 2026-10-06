@@ -8,6 +8,15 @@ export const PLATFORMS = ["Reels / TikTok", "LinkedIn"] as const;
 export const AUDIENCES = ["Teens 13–18", "Parents"] as const;
 export const FORMATS = ["Director picks", "Talking head", "Myth-busting", "Story", "Tutorial"] as const;
 
+/** How the finished video is edited. Chosen up front (it shapes the shot list) and switchable at the end. */
+export const LOOKS = ["Standard", "Editorial", "Cinematic"] as const;
+export type Look = (typeof LOOKS)[number];
+export const LOOK_BLURB: Record<Look, string> = {
+  Standard: "Bold animated captions, callouts and punchy motion.",
+  Editorial: "Calm explainer: illustrated paper cards, a takeaway headline, soft cuts.",
+  Cinematic: "A 25–30 s film: a dark, dramatic build with huge serif words, a montage, then a warm human payoff.",
+};
+
 export const CONCEPT_MAX = 280;
 export const STORY_MAX = 3000;
 
@@ -22,6 +31,8 @@ export const BriefSchema = z.object({
   story: z.string().trim().max(STORY_MAX).default(""),
   /** For a video in a project: the goal and what's been made, so the series builds instead of repeating. */
   series: z.string().trim().max(1500).default(""),
+  /** The edit style the shots are planned for. */
+  look: z.enum(LOOKS).default("Standard"),
 });
 export type Brief = z.infer<typeof BriefSchema>;
 
@@ -34,6 +45,7 @@ export const DEFAULT_BRIEF: Brief = {
   format: "Director picks",
   story: "",
   series: "",
+  look: "Standard",
 };
 
 export const targetSeconds = (brief: Pick<Brief, "length">) => parseInt(brief.length, 10);

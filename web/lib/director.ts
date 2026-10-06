@@ -28,6 +28,11 @@ Output rules:
 
 When the brief includes a <story>: a writer wrote it from the creator's own account and the creator approved it. Build the plan from that story, not from scratch. Keep its order, its facts and its voice, and keep its lines word for word wherever they fit; tighten or cut only to hit the target length. Its [bracketed notes] are visual ideas: turn the good ones into b-roll, insert or screen shots. All three hooks must fit this story; one may be the story's own opening line.
 
+Edit style (in the brief) — plan the shots the finished edit will need:
+- Standard: as above.
+- Editorial: a calm explainer with illustrated cards over the voice. Make the value beats clear, explanatory points; add one or two inserts or B-roll of meaningful objects.
+- Cinematic: a 25–30-second cinematic introduction whatever the target length says, with this shape. 0–3 s: the strongest direct-to-camera line, a centered medium shot, no greeting. 3–11 s: a dramatic build — a-roll lines with a few punchy words worth showing huge, plus portrait shots (profile, close-up of the face). 11–19 s: a montage of short silent shots — a wide shot, facial details, hands working, a meaningful object and the resulting project (for EdAI: building, teaching, testing, demonstrating). 19–25 s: a genuine human payoff in warmer natural light — a candid reaction, a beginner moment, a funny exchange or a surprising result with real people; describe what to capture, never a staged testimonial. Ending: a strong portrait or real project shot to hold under the closing title. Use 9–12 shots, most of them 1–3 s; beat seconds sum to about 28.
+
 When the brief includes a <series>: this video is one of a run toward the creator's goal. Fit it into the series — follow on from recent videos where it helps, never reuse their hooks or points, and if it's the first, set the series up. The CTA beat can point to the next video ("Part 2 tomorrow") when that fits the schedule.`;
 
 // Plain JSON schema for structured outputs. Length limits are enforced afterwards by PlanSchema.
@@ -121,6 +126,7 @@ export function briefText(brief: Brief): string {
     `Audience: ${brief.audience}`,
     `Target length: ${targetSeconds(brief)} seconds`,
     `Format: ${brief.format === "Director picks" ? "your choice" : brief.format}`,
+    `Edit style: ${brief.look}`,
   ];
   if (brief.story) lines.push("", `<story>\n${brief.story}\n</story>`);
   if (brief.series) lines.push("", `<series>\n${brief.series}\n</series>`);

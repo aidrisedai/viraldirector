@@ -25,15 +25,21 @@ function Thumb({ url, kind, className }: { url: string; kind: "image" | "video";
   return src ? <img className={className} src={src} alt="" draggable={false} /> : <span className={className} />;
 }
 
-const CALLOUT_NAMES: Record<CalloutStyle, string> = { label: "Label", stat: "Big number", card: "Card", takeaway: "Takeaway", sticker: "Sticker" };
+const CALLOUT_NAMES: Record<CalloutStyle, string> = {
+  label: "Label", stat: "Big number", card: "Card", takeaway: "Takeaway", sticker: "Sticker", headline: "Big word", title: "End title",
+};
 const CALLOUT_HINTS: Record<CalloutStyle, string> = {
   label: "A short tag over the video.",
   stat: "Big numbers count up on screen — try “200 users”.",
   card: "An illustrated paper card replaces the picture while you keep talking. Hold it 1.5–3 s so people can read it.",
   takeaway: "One huge headline over dimmed, blurred footage. Save it for your main point.",
   sticker: "A small paper-cutout picture beside you, away from your face.",
+  headline: "One or two of your words, huge, across the top of the frame — on the moment you say them.",
+  title: "A large closing title over your last shot, with the call to action under it and a small EdAI logo.",
 };
-const BLOCK_ICON: Record<CalloutStyle, Parameters<typeof Icon>[0]["name"]> = { label: "type", stat: "type", card: "image-plus", takeaway: "zap", sticker: "sparkles" };
+const BLOCK_ICON: Record<CalloutStyle, Parameters<typeof Icon>[0]["name"]> = {
+  label: "type", stat: "type", card: "image-plus", takeaway: "zap", sticker: "sparkles", headline: "type", title: "type",
+};
 
 /** Text, kind and (for cards and stickers) picture of an on-screen text item. Shared by the inspector and the phone sheet. */
 function CalloutFields({ c, phone, onLive, onCommit, onDone }: {
@@ -65,7 +71,7 @@ function CalloutFields({ c, phone, onLive, onCommit, onDone }: {
   const hasArt = c.style === "card" || c.style === "sticker";
   return (
     <>
-      {text(c.style === "card" ? "Headline" : c.style === "sticker" ? "Label under the picture" : "On-screen text", "text", 48)}
+      {text(c.style === "card" ? "Headline" : c.style === "sticker" ? "Label under the picture" : c.style === "title" ? "Title" : c.style === "headline" ? "Word(s)" : "On-screen text", "text", 48)}
       <div className={`${e.seg} ${e.segWrap}`} role="group" aria-label="Text style">
         {CALLOUT_STYLES.map((st) => (
           <button
@@ -80,6 +86,7 @@ function CalloutFields({ c, phone, onLive, onCommit, onDone }: {
       </div>
       {c.style === "card" && text("Words to highlight", "highlight", 48, "Copy them from the headline")}
       {c.style === "card" && text("Supporting line", "support", 60, "A short line under the picture")}
+      {c.style === "title" && text("Call to action", "support", 60, "e.g. Follow for part 2")}
       {hasArt && (
         <label className={e.fieldLabel}>
           <span>Picture</span>
@@ -674,11 +681,13 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
       <section className={e.m} aria-label="Video editor">
         <header className={e.mTop}>
           <button type="button" className={e.mIcon} onClick={onClose} aria-label="Close editor"><Icon name="x" size={20} /></button>
-          <span className={e.mTitle}>{versionTabs}</span>
+          <span className={e.mTitle}>Edit</span>
           <button type="button" className={e.mIcon} onClick={undo} disabled={!history.past} aria-label="Undo"><Icon name="undo" size={18} /></button>
           <button type="button" className={e.mIcon} onClick={redo} disabled={!history.future} aria-label="Redo"><Icon name="redo" size={18} /></button>
           <button type="button" className={e.mExport} onClick={() => openSheet("export")}>Export</button>
         </header>
+
+        <div className={e.mVersions}>{versionTabs}</div>
 
         <div className={e.mStage} onClick={toggle}>
           <div className={e.mScreen} style={{ aspectRatio: format === "4:5" ? "4 / 5" : "9 / 16" }}>
@@ -725,7 +734,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                     {shotTitles[c.shot] ?? `Shot ${c.shot + 1}`}
                   </button>
                 ))}
-                {scene && brand && (
+                {scene?.endCard && (
                   <div className={`${e.mBlock} ${e.endBlock}`} style={{ left: x(scene.seqSeconds) + 1, width: Math.max(6, (total - scene.seqSeconds) * pps - 2) }}>End card</div>
                 )}
               </div>
@@ -998,7 +1007,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                   {shotTitles[c.shot] ?? `Shot ${c.shot + 1}`}
                 </div>
               ))}
-              {scene && brand && (
+              {scene?.endCard && (
                 <div className={`${e.block} ${e.endBlock}`} style={{ left: scene.seqSeconds * pps + 1, width: Math.max(4, (total - scene.seqSeconds) * pps - 2) }}>
                   End card
                 </div>
@@ -1045,7 +1054,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                     ) : (
                       <Icon name="video" size={12} />
                     )}
-                    {c.style === "pip" ? "Card" : "Full"} · {item?.name ?? c.source}
+                    {c.style === "pip" ? "Card" : c.style === "panel" ? "Panel" : "Full"} · {item?.name ?? c.source}
                     <span className={e.handle} onPointerDown={(ev) => startBlock(ev, "cutaway", i, "resize", at, c.seconds)} />
                   </div>
                 );
@@ -1133,6 +1142,7 @@ export function Editor({ timeline, plan, onPlan, state, format, hookTitle, shotT
                 <div className={e.seg} role="group" aria-label="Overlay style">
                   <button type="button" aria-pressed={selCutaway.style === "full"} onClick={() => commit(updateCutaway(plan!, sel.index, { style: "full" }))}>Full screen</button>
                   <button type="button" aria-pressed={selCutaway.style === "pip"} onClick={() => commit(updateCutaway(plan!, sel.index, { style: "pip" }))}>Card</button>
+                  <button type="button" aria-pressed={selCutaway.style === "panel"} onClick={() => commit(updateCutaway(plan!, sel.index, { style: "panel" }))}>Panel</button>
                 </div>
                 <label className={e.inspectorRow} style={{ gap: 6 }}>
                   Seconds

@@ -96,6 +96,12 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
   }, []);
 
   const busy = render.state === "preparing" || render.state === "rendering";
+  // Open on the edit style chosen at the start, until there's an edit to look at.
+  const { setVersion } = finish;
+  const anyPlan = Object.values(finish.versions).some((v) => v.editPlan);
+  useEffect(() => {
+    if (!anyPlan) setVersion(brief.look);
+  }, [anyPlan, brief.look, setVersion]);
   const hookTitle = plan.hooks[hook].line.replace(/^[“"]|[”"]$/g, "");
   const signature = kept.map((t) => t?.id ?? "-").join(",");
   const planStale = !!finish.editPlan && finish.editPlan.signature !== signature;
@@ -198,7 +204,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     return edits;
   };
 
-  /** The Director edits the video twice, in parallel: the Standard version and the Editorial one. */
+  /** The Director edits the video once per version (Standard, Editorial, Cinematic), in parallel. */
   const askForEdit = async (): Promise<string> => {
     if (!cut.length) return "Keep at least one take first.";
     const timeline = await currentTimeline();

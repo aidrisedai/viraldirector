@@ -1,6 +1,6 @@
 import { Button } from "@/components/ds/Button";
 import { Icon } from "@/components/ds/Icon";
-import { AUDIENCES, CONCEPT_MAX, FORMATS, GOALS, LENGTHS, PLATFORMS, SAMPLE_CONCEPT, type Brief } from "@/lib/plan";
+import { AUDIENCES, CONCEPT_MAX, FORMATS, GOALS, LENGTHS, LOOK_BLURB, LOOKS, PLATFORMS, SAMPLE_CONCEPT, type Brief } from "@/lib/plan";
 import { Chips } from "./Chips";
 import { StoryWriter, storyReady, useStoryWriter } from "./StoryWriter";
 import { useDictation } from "./useDictation";
@@ -121,6 +121,21 @@ export function ConceptStep({ brief, onChange, onNext, loading, error }: Props) 
               );
             })}
           </div>
+        </div>
+
+        <div className={s.stack} style={{ gap: 10 }}>
+          <span className={s.label}>Edit style</span>
+          <div className={s.formatGrid} role="group" aria-label="Edit style">
+            {LOOKS.map((l) => (
+              <button key={l} type="button" aria-pressed={brief.look === l} className={`${s.format} ${brief.look === l ? s.formatOn : ""}`} onClick={() => onChange({ look: l })}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <span className={s.hint}>
+            {LOOK_BLURB[brief.look]} The Director plans your shots for it. When you’re done filming you get all three versions to
+            compare.
+          </span>
         </div>
 
         <div className={s.submitRow}>

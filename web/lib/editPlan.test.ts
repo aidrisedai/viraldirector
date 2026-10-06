@@ -135,3 +135,26 @@ describe("Editorial callouts", () => {
     expect(second).toEqual({ segment: 3, at: 1, seconds: 2, text: "Ship it", style: "card", art: "lightbulb" });
   });
 });
+
+describe("Cinematic plans", () => {
+  const extras = ["a", "b", "c", "d"].map((id) => ({ id, kind: "image" as const, seconds: null }));
+
+  it("lets up to three panels share a moment, but nothing else overlaps them", () => {
+    const panel = (id: string) => ({ source: `extra:${id}`, segment: 1, at: 2, seconds: 2.5, style: "panel" as const });
+    const plan = normalizePlan(
+      { ...empty, cutaways: [panel("a"), panel("b"), panel("c"), panel("d"), { source: "extra:a", segment: 1, at: 3, seconds: 1, style: "full" }] },
+      timeline,
+      extras,
+    );
+    expect(plan.cutaways.map((c) => `${c.source}/${c.style}`)).toEqual(["extra:a/panel", "extra:b/panel", "extra:c/panel"]);
+  });
+
+  it("keeps a payoff that points at a kept segment and marks it and what follows as warm", () => {
+    const plan = normalizePlan({ ...empty, payoff: 3, altHooks: [" Most teens never start. ", ""] }, timeline, []);
+    expect(plan.payoff).toBe(3);
+    expect(plan.altHooks).toEqual(["Most teens never start."]);
+    expect(composeEdit(timeline, plan).sequence.map((s) => !!s.warm)).toEqual([false, false, false, true]);
+    expect(normalizePlan({ ...empty, payoff: 9 }, timeline, []).payoff).toBeUndefined();
+    expect(normalizePlan({ ...empty, payoff: 3, drop: [3] }, timeline, []).payoff).toBeUndefined();
+  });
+});

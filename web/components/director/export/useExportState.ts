@@ -20,13 +20,13 @@ export type Revision = { feedback: string; summary: string };
 export type Version = { editPlan: PlanState | null; style: Style; revisions: Revision[] };
 
 const fresh = (look: Look): Version => ({ editPlan: null, style: lookStyle(look), revisions: [] });
-const freshVersions = (): Record<Look, Version> => ({ Standard: fresh("Standard"), Editorial: fresh("Editorial") });
+const freshVersions = (): Record<Look, Version> => ({ Standard: fresh("Standard"), Editorial: fresh("Editorial"), Cinematic: fresh("Cinematic") });
 
 const apply = <T,>(next: SetStateAction<T>, prev: T): T => (typeof next === "function" ? (next as (p: T) => T)(prev) : next);
 
 /**
  * Finishing state that should survive moving between steps: captions, added content, the music, and two
- * versions of the edit (Standard and Editorial). `editPlan`, `style` and `revisions` belong to the version being
+ * versions of the edit (Standard, Editorial and Cinematic). `editPlan`, `style` and `revisions` belong to the version being
  * worked on; `setVersion` switches, and `update` changes a named version (for edits that finish after a switch).
  */
 export function useExportState() {

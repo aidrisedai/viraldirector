@@ -76,8 +76,9 @@ export function ExtrasCard({ state, onPlan, planStale }: Props) {
         <span className={s.createTitle}>Extra content</span>
         <span className={s.hint}>
           Add screenshots, photos, a logo or extra clips, plus anything you want mentioned. The Director decides where each
-          one goes, and makes two versions to choose from: <strong>Standard</strong> (bold captions and callouts) and{" "}
-          <strong>Editorial</strong> (illustrated paper cards, calm captions, a takeaway headline).
+          one goes, and makes three versions to choose from: <strong>Standard</strong> (bold captions and callouts),{" "}
+          <strong>Editorial</strong> (illustrated paper cards, calm captions, a takeaway headline) and <strong>Cinematic</strong>{" "}
+          (a dark dramatic build with huge serif words, a montage, then a warm human payoff).
         </span>
       </div>
 
@@ -152,13 +153,21 @@ export function ExtrasCard({ state, onPlan, planStale }: Props) {
             {counts && <span className={s.hint}>{counts}</span>}
           </div>
           {p.summary && <span style={{ fontSize: 15, lineHeight: 1.5 }}>{p.summary}</span>}
+          {!!p.altHooks?.length && (
+            <div className={s.stack} style={{ gap: 4 }}>
+              <span className={s.label}>Other ways to open</span>
+              <ol className={s.revisionList}>
+                {p.altHooks.map((h) => <li key={h}><span>{h}</span></li>)}
+              </ol>
+            </div>
+          )}
         </div>
       )}
       {message && <span className={s.hint}>{message}</span>}
 
       <div className={s.actions}>
         <Button size="md" icon="sparkles" onClick={plan} disabled={busy}>
-          {busy ? "The Director is making both versions…" : Object.values(versions).some((v) => v.editPlan) ? "Make both versions again" : "Let the Director make both versions"}
+          {busy ? "The Director is making all three versions…" : Object.values(versions).some((v) => v.editPlan) ? "Make all three versions again" : "Let the Director make all three versions"}
         </Button>
       </div>
     </div>

@@ -121,10 +121,9 @@
 .versions button[aria-pressed="true"] { background: #F4EEE3; color: #141413; }
 .fieldLabel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .fieldLabel > span { font-size: 12px; font-weight: 600; opacity: .7; }
-/* Phone header: the switch shares the row with close, undo, redo and Export. */
-.mTitle .versions { padding: 2px; }
-.mTitle .versions button { padding: 6px 9px; font-size: 12.5px; min-height: 30px; }
-.mTitle .versionDot { display: none; }
+/* Phone: the switch gets its own row under the header. */
+.mVersions { display: flex; justify-content: center; padding: 0 10px 6px; flex: none; }
+.mVersions .versions button { padding: 6px 12px; font-size: 13px; min-height: 32px; }
 .versionDot { width: 6px; height: 6px; border-radius: 3px; background: var(--brand-accent); }
 
 .danger { border-color: rgba(229, 72, 77, .5); color: #FFB4B6; }

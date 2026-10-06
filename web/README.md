@@ -207,6 +207,15 @@ Rendering is real time (a 45s video takes about 45s) and needs the tab to stay v
   correction** per clip (exposure, contrast and grey-world white balance, capped so skin stays natural — Chrome, Edge
   and Firefox; Safari plays clips as recorded). Cards, takeaways and stickers are ordinary Text items in the editor:
   edit the headline, highlight, supporting line and picture, or move and resize them.
+- **Cinematic version** (`render/cinematic.ts`): a 25–30 s cinematic introduction. The creator can pick the edit style
+  (Standard / Editorial / Cinematic) on the Concept step, so the Director plans the shots that style needs; Cinematic asks
+  for a direct-to-camera hook, portrait shots, a montage of wide shots, details, hands working and the finished project,
+  and a real human payoff. At Export the Director makes all three versions, opening on the chosen one. Cinematic has
+  word-by-word Outfit captions, no opening logo, a dark grade with a vignette for the build, oversized Libre Baskerville
+  "big words" timed to the speech, an optional three-panel composition (face, hands, result) from cutaways marked
+  Panel, a pale flash into a warmer payoff with smaller captions (the Director marks where the payoff starts, or names
+  the missing shot to record — it never fakes one), and a closing title with the call to action and a small EdAI logo
+  instead of the end card. Every version also gets three alternative opening hooks.
 - **Captions (.srt)** (`lib/srt.ts`): downloads the captions timed to the finished video, in short phrases, for platforms
   that take a separate caption file.
 - **Look** (`export/LookControls.tsx`): caption style, size and position, transition, energy, the opening title

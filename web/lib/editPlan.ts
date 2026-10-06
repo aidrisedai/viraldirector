@@ -1,7 +1,9 @@
 import { z } from "zod";
 import type { Segment, TimedWord } from "./edit";
 import { isArt } from "./art";
-import { fitText } from "./plan";
+import { fitText, LOOKS, type Look } from "./plan";
+
+export { LOOKS, type Look };
 
 // ---------- Extra content the creator adds ----------
 
@@ -31,16 +33,17 @@ const CutawaySchema = z.object({
   /** Seconds into that segment (as trimmed). */
   at: z.number().min(0),
   seconds: z.number().positive(),
-  /** full: replaces the picture; pip: a card over the speaker. */
-  style: z.enum(["full", "pip"]),
+  /** full: replaces the picture; pip: a card over the speaker; panel: one of up to three stacked panels shown together. */
+  style: z.enum(["full", "pip", "panel"]),
 });
 
 /**
  * stat: a big number or fact; label: a short tag or heading. The Editorial look adds card: an illustrated
  * paper card that replaces the picture while the voice continues; takeaway: one huge headline over dimmed,
- * blurred footage; sticker: a small paper-cutout illustration beside the speaker.
+ * blurred footage; sticker: a small paper-cutout illustration beside the speaker. The Cinematic look adds headline:
+ * one or two spoken words, oversized, dominating the upper frame; title: the closing title (support is the call to action).
  */
-export const CALLOUT_STYLES = ["stat", "label", "card", "takeaway", "sticker"] as const;
+export const CALLOUT_STYLES = ["stat", "label", "card", "takeaway", "sticker", "headline", "title"] as const;
 export type CalloutStyle = (typeof CALLOUT_STYLES)[number];
 /** Callouts that take over the whole picture (captions step aside while they're up). */
 export const FULL_FRAME: ReadonlySet<CalloutStyle> = new Set(["card", "takeaway"]);
@@ -75,6 +78,10 @@ export const EditPlanSchema = z.object({
   endCta: fitText(60, 0),
   /** One or two sentences on what the Director did, shown to the creator. */
   summary: fitText(500, 0),
+  /** Cinematic: the segment where the warm human payoff starts (a pale flash, warmer colour, smaller captions). */
+  payoff: z.number().int().optional(),
+  /** Three other ways the video could open, for the creator to consider. */
+  altHooks: z.array(fitText(200)).transform((x) => x.slice(0, 3)).optional(),
 });
 export type EditPlan = z.infer<typeof EditPlanSchema>;
 export type Cutaway = z.infer<typeof CutawaySchema>;
@@ -89,9 +96,6 @@ export const CAPTION_SIZES = ["S", "M", "L"] as const;
 export const CAPTION_POSITIONS = ["Middle", "Lower"] as const;
 export const TRANSITIONS = ["Flash", "Whip", "Zoom", "Soft", "Cut"] as const;
 export const ENERGIES = ["Calm", "Punchy"] as const;
-/** The two ways the Director finishes a video; the creator gets one of each and keeps either. */
-export const LOOKS = ["Standard", "Editorial"] as const;
-export type Look = (typeof LOOKS)[number];
 
 export const StyleSchema = z.object({
   /**
@@ -144,7 +148,21 @@ export const EDITORIAL_STYLE: Style = {
   grade: true,
 };
 
-export const lookStyle = (look: Look): Style => (look === "Editorial" ? EDITORIAL_STYLE : DEFAULT_STYLE);
+/** The Cinematic version's starting look: dark and dramatic, captions revealed word by word, decisive cuts. */
+export const CINEMATIC_STYLE: Style = {
+  captions: "Editorial",
+  captionSize: "M",
+  captionPosition: "Middle",
+  transition: "Cut",
+  energy: "Calm",
+  title: "",
+  showTitle: false,
+  musicVolume: 0.4,
+  look: "Cinematic",
+  grade: true,
+};
+
+export const lookStyle = (look: Look): Style => (look === "Editorial" ? EDITORIAL_STYLE : look === "Cinematic" ? CINEMATIC_STYLE : DEFAULT_STYLE);
 
 const ms = (n: number) => Math.round(n * 1000) / 1000;
 const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
@@ -202,9 +220,16 @@ export function normalizePlan(
   const usedShots = new Set<number>();
   const busy = new Map<number, [number, number][]>(); // segment → covered windows
 
-  const fits = (segment: number, a: number, b: number) =>
-    !strict || !(busy.get(segment) ?? []).some(([x, y]) => a < y && b > x);
-  const take = (segment: number, a: number, b: number) => busy.set(segment, [...(busy.get(segment) ?? []), [a, b]]);
+  // Panels share their window with each other (they're shown together), but not with other cutaways.
+  const panels = new Map<number, [number, number][]>();
+  const fits = (segment: number, a: number, b: number, panel = false) =>
+    !strict ||
+    (!(busy.get(segment) ?? []).some(([x, y]) => a < y && b > x) &&
+      (panel ? (panels.get(segment) ?? []).filter(([x, y]) => a < y && b > x).length < 3 : !(panels.get(segment) ?? []).some(([x, y]) => a < y && b > x)));
+  const take = (segment: number, a: number, b: number, panel = false) => {
+    const map = panel ? panels : busy;
+    map.set(segment, [...(map.get(segment) ?? []), [a, b]]);
+  };
 
   const cutaways: Cutaway[] = [];
   for (const c of [...plan.cutaways].sort((x, y) => x.segment - y.segment || x.at - y.at)) {
@@ -224,8 +249,9 @@ export function normalizePlan(
     const len = segLength(seg);
     const at = Math.min(Math.max(0, c.at), Math.max(0, len - 0.8));
     const seconds = Math.min(c.seconds, maxLen, len - at);
-    if (seconds < MIN_LEN || !fits(c.segment, at, at + seconds)) continue;
-    take(c.segment, at, at + seconds);
+    const panel = c.style === "panel";
+    if (seconds < MIN_LEN || !fits(c.segment, at, at + seconds, panel)) continue;
+    take(c.segment, at, at + seconds, panel);
     if (c.source.startsWith("shot:")) usedShots.add(Number(c.source.slice(5)));
     cutaways.push({ ...c, at: ms(at), seconds: ms(seconds) });
   }
@@ -238,7 +264,7 @@ export function normalizePlan(
     if (!seg || !text) continue;
     const len = segLength(seg);
     // A card needs time to be read (headline, picture, then the supporting line).
-    const [least, most] = c.style === "card" ? [1.5, 3.5] : c.style === "takeaway" ? [1.2, 3] : [1, 4];
+    const [least, most] = c.style === "card" ? [1.5, 3.5] : c.style === "takeaway" || c.style === "title" ? [1.2, 3.5] : [1, 4];
     const at = Math.min(Math.max(0, c.at), Math.max(0, len - least));
     const seconds = Math.min(Math.max(least, c.seconds), strict ? most : 12, len - at);
     const windows = perSegment.get(c.segment) ?? [];
@@ -263,7 +289,13 @@ export function normalizePlan(
     .map((f) => ({ segment: f.segment, text: f.text.trim() }))
     .filter((f) => f.text && timeline[f.segment]?.speech);
 
-  return { drop, trims, captionFixes, cutaways, callouts, emphasis, endCta: plan.endCta.trim() || DEFAULT_CTA, summary: plan.summary.trim() };
+  const payoff = plan.payoff !== undefined && plan.payoff >= 0 && timeline[plan.payoff] && !drop.includes(plan.payoff) ? plan.payoff : undefined;
+  const altHooks = (plan.altHooks ?? []).map((h) => h.trim()).filter(Boolean).slice(0, 3);
+  return {
+    drop, trims, captionFixes, cutaways, callouts, emphasis, endCta: plan.endCta.trim() || DEFAULT_CTA, summary: plan.summary.trim(),
+    ...(payoff !== undefined ? { payoff } : {}),
+    ...(altHooks.length ? { altHooks } : {}),
+  };
 }
 
 /**
@@ -322,6 +354,8 @@ export type ComposedSegment = Segment & {
   callouts: Callout[];
   /** Indexes into `words` to emphasise. */
   emphasis: Set<number>;
+  /** Cinematic: part of the warm human payoff. */
+  warm?: boolean;
 };
 
 export type ComposedEdit = { sequence: ComposedSegment[]; endCta: string };
@@ -343,7 +377,8 @@ export function composeEdit(raw: Segment[], plan: EditPlan): ComposedEdit {
       });
     const wanted = new Set(plan.emphasis.filter((e) => e.segment === i).map((e) => norm(e.word)));
     const emphasis = new Set(seg.words.flatMap((w: TimedWord, k) => (wanted.has(norm(w.word)) ? [k] : [])));
-    sequence.push({ ...seg, overlays, callouts: plan.callouts.filter((c) => c.segment === i), emphasis });
+    const warm = plan.payoff !== undefined && i >= plan.payoff;
+    sequence.push({ ...seg, overlays, callouts: plan.callouts.filter((c) => c.segment === i), emphasis, ...(warm ? { warm } : {}) });
   });
   return { sequence, endCta: plan.endCta || DEFAULT_CTA };
 }

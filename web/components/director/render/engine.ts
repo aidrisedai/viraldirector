@@ -341,7 +341,7 @@ export class Engine {
     const sc = this.scene, comp = this.comp;
     if (!sc || !comp) return;
     this.ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
-    if (this.t >= sc.seqSeconds && sc.brand) comp.drawEndCard(this.t - sc.seqSeconds);
+    if (this.t >= sc.seqSeconds && sc.endCard) comp.drawEndCard(this.t - sc.seqSeconds);
     else {
       const i = segmentAt(sc, this.t);
       const seg = sc.seq[i];
@@ -408,7 +408,7 @@ export class Engine {
       this.t = i + 1 < sc.seq.length ? sc.starts[i + 1] : sc.seqSeconds;
     }
 
-    if (alive() && sc.brand) {
+    if (alive() && sc.endCard) {
       this.updateMix();
       for (const g of this.clipGains.values()) g.gain.value = 0;
       const startWall = performance.now() - (this.t - sc.seqSeconds) * 1000;
