@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createSpeechEnd } from "@/lib/speechEnd";
 import { startTranscript } from "@/lib/speech";
 import { CLIP_LEVEL, type Take } from "@/lib/takes";
 
@@ -39,9 +40,17 @@ function cameraError(e: unknown): string {
   return "The camera couldn’t start. Try again, or upload a clip instead.";
 }
 
+/** After the planned length, keep recording until the speaker has been quiet this long… */
+const QUIET_TO_STOP = 0.8;
+/** …but never more than this much extra: about the shot's own length, between 4 and 15 seconds. */
+const overrunMax = (seconds: number) => Math.min(15, Math.max(4, seconds));
+/** A pressed stop waits this long, so the last word isn't clipped by a quick tap. */
+const STOP_TAIL = 0.35;
+
 /**
- * Live camera preview plus a recorder that counts down, records for `seconds` (+ a small
- * buffer, per GR-3), measures audio level while recording, then hands back a Take.
+ * Live camera preview plus a recorder that counts down and records for `seconds`. It never cuts the speaker
+ * off: past the planned length it keeps going until they've finished talking. It measures audio level while
+ * recording, then hands back a Take.
  */
 export function useRecorder({ shot, seconds, onTake }: { shot: number; seconds: number; onTake: (t: Take) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -126,8 +135,10 @@ export function useRecorder({ shot, seconds, onTake }: { shot: number; seconds: 
     const buf = new Float32Array(2048);
 
     const started = performance.now();
+    const finished = createSpeechEnd({ planned: seconds, quiet: QUIET_TO_STOP, minSpeech: SPEECH_RMS });
     const tick = () => {
-      setElapsed((performance.now() - started) / 1000);
+      const t = (performance.now() - started) / 1000;
+      setElapsed(t);
       if (analyser) {
         analyser.getFloatTimeDomainData(buf);
         let sum = 0, framePeak = 0;
@@ -139,7 +150,13 @@ export function useRecorder({ shot, seconds, onTake }: { shot: number; seconds: 
         if (framePeak > peak) peak = framePeak;
         if (framePeak >= CLIP_LEVEL) clippedFrames++;
         frames++;
-        if (Math.sqrt(sum / buf.length) > SPEECH_RMS) voicedFrames++;
+        const rms = Math.sqrt(sum / buf.length);
+        if (rms > SPEECH_RMS) voicedFrames++;
+        // Past the planned length: stop once they've finished the sentence.
+        if (finished(t, rms) && recorder.state === "recording") {
+          recorder.stop();
+          return;
+        }
       }
       raf.current = window.requestAnimationFrame(tick);
     };
@@ -175,7 +192,9 @@ export function useRecorder({ shot, seconds, onTake }: { shot: number; seconds: 
     recorder.start(250);
     setPhase("recording");
     tick();
-    timers.current.push(window.setTimeout(() => recorder.state === "recording" && recorder.stop(), (seconds + 0.5) * 1000));
+    // Without a level meter there's no way to hear the end of the sentence, so allow a generous tail.
+    const ceiling = analyser ? seconds + overrunMax(seconds) : seconds + 3;
+    timers.current.push(window.setTimeout(() => recorder.state === "recording" && recorder.stop(), ceiling * 1000));
   }, [seconds, shot]);
 
   const start = useCallback(() => {
@@ -191,7 +210,8 @@ export function useRecorder({ shot, seconds, onTake }: { shot: number; seconds: 
       clearTimers();
       setPhase("ready");
     } else if (recorderRef.current?.state === "recording") {
-      recorderRef.current.stop();
+      const r = recorderRef.current;
+      timers.current.push(window.setTimeout(() => r.state === "recording" && r.stop(), STOP_TAIL * 1000));
     }
   }, [phase]);
 

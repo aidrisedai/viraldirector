@@ -382,7 +382,11 @@ export class Engine {
       const startInto = this.t - sc.starts[i];
       if (!v) break;
       if (Math.abs(v.currentTime - (seg.from + startInto)) > 0.08) v.currentTime = seg.from + startInto;
-      for (const [id, g] of this.clipGains) g.gain.setValueAtTime(id === seg.take.id ? seg.gain : 0, audio.currentTime);
+      // A few milliseconds of fade at every cut, so no clip starts or stops with a click.
+      for (const [id, g] of this.clipGains) {
+        g.gain.cancelScheduledValues(audio.currentTime);
+        g.gain.setTargetAtTime(id === seg.take.id ? seg.gain : 0, audio.currentTime, 0.012);
+      }
       this.updateMix();
       // Keep drawing while play() starts, so the cut never freezes and the transition always plays out.
       const cutWall = performance.now() - startInto * 1000;

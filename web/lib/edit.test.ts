@@ -64,8 +64,8 @@ describe("buildTimeline", () => {
 
   it("trims dead air around speech but keeps B-roll whole", () => {
     const [hook, , broll] = buildTimeline(SAMPLE_PLAN, kept, analyses);
-    expect(hook.from).toBeCloseTo(0.68, 2);
-    expect(hook.to).toBeCloseTo(3.7, 2);
+    expect(hook.from).toBeCloseTo(0.6, 2);
+    expect(hook.to).toBeCloseTo(3.9, 2);
     expect(broll.from).toBe(0);
     expect(broll.to).toBe(3.2);
     expect(broll.words).toEqual([]);
@@ -93,7 +93,7 @@ describe("buildTimeline", () => {
   });
 
   it("totals the edited length", () => {
-    expect(timelineSeconds(buildTimeline(SAMPLE_PLAN, kept, analyses))).toBeCloseTo(3.02 + 7.98 + 3.2, 1);
+    expect(timelineSeconds(buildTimeline(SAMPLE_PLAN, kept, analyses))).toBeCloseTo(3.3 + 8.3 + 3.2, 1);
   });
 });
 
@@ -137,8 +137,8 @@ describe("exact captions", () => {
     });
     const [seg] = buildTimeline(SAMPLE_PLAN, [undefined, undefined, withWords], new Map(), { t2: "Bad ideas" });
     expect(seg.words.map((w) => [w.word, w.start])).toEqual([["Bad", 1.0], ["ideas", 1.3]]);
-    expect(seg.from).toBeCloseTo(0.88, 6);
-    expect(seg.to).toBeCloseTo(2.1, 6);
+    expect(seg.from).toBeCloseTo(0.8, 6);
+    expect(seg.to).toBeCloseTo(2.3, 6);
   });
 
   it("uses the creator's caption edit over the transcript and script", () => {

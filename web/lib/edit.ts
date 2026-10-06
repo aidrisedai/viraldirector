@@ -136,8 +136,8 @@ export type Segment = {
   voiceLevel: number | null;
 };
 
-const LEAD = 0.12; // keep a breath before the first word
-const TAIL = 0.3; // and let the last word land
+const LEAD = 0.2; // keep a breath before the first word
+const TAIL = 0.5; // and let the last word (and its trailing sound) land before the cut
 // Speech level that lands near the loudness social platforms play at (about −14 to −16 LUFS for voice).
 export const TARGET_RMS = 0.25;
 

@@ -102,7 +102,7 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
           {phase === "countdown" && <div className={s.countdown} aria-live="assertive">{count}</div>}
           <div className={s.timer}>
             <span className={s.recDot} style={{ opacity: recording ? 1 : 0.35 }} />
-            {clock(elapsed)} / {clock(total)}
+            {clock(rawElapsed)} / {clock(total)}
           </div>
           <div className={s.recProgress} style={{ width: `${(elapsed / total) * 100}%` }} />
         </div>
@@ -129,12 +129,12 @@ export function RecordStep({ plan, shot, onTake, onBack }: Props) {
           >
             <span className={phase === "ready" ? s.recStart : s.recStop} />
           </button>
-          <span className={s.recClock}>{clock(elapsed)} / {clock(total)}</span>
+          <span className={s.recClock}>{clock(rawElapsed)} / {clock(total)}</span>
           <span className={s.stopHint}>
             {phase === "ready" ? (
               <>Starts after a 3-second countdown.<br />Press space to start.</>
             ) : (
-              <>Stops automatically at {total}s.<br />Press space to stop early.</>
+              <>Aim for {total}s — it keeps rolling until you finish your sentence.<br />Press space to stop.</>
             )}
           </span>
         </div>
