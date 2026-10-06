@@ -123,6 +123,9 @@
 .shotTitle { font-size: 15px; font-weight: 500; }
 .small { font-size: 13px; color: var(--vd-text-muted); }
 .tiny { font-size: 12px; color: var(--vd-text-muted); }
+.aiPanel { border: 1px dashed var(--vd-border, rgba(11, 11, 10, .2)); border-radius: 14px; padding: 14px 16px; }
+.aiPanel > summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+.aiPanel[open] > summary { margin-bottom: 12px; }
 .detail { composes: card; padding: 28px; display: flex; flex-direction: column; gap: 24px; position: sticky; top: 24px; }
 .specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; }
 .spec { display: flex; flex-direction: column; gap: 4px; font-size: 15px; line-height: 1.45; }

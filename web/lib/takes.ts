@@ -18,6 +18,10 @@ export type Take = {
   /** Word-level timings from on-device speech recognition, relative to the clip; null until run. */
   words?: { word: string; start: number; end: number }[] | null;
   source: "camera" | "upload";
+  /** Where an uploaded clip came from, when it isn't the creator's own footage. */
+  origin?: "ai" | "stock";
+  /** Credit for stock footage ("Video by … on Pexels"). */
+  credit?: string;
 };
 
 export type Check = { label: string; note: string; value: number; warn: boolean };

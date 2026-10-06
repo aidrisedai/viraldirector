@@ -9,6 +9,7 @@ import {
   type EditPlan, type EditRequest, type EditResponse, type Extra, type Look, type Style,
 } from "@/lib/editPlan";
 import { toSrt } from "@/lib/srt";
+import { AI_LABEL_NOTE } from "@/lib/aiPrompts";
 import { reviseLocally } from "@/lib/revise";
 import { plannedSeconds, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/plan";
 import { exportChecks, scriptText, slug, takeFileName, type Take } from "@/lib/takes";
@@ -118,6 +119,11 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     return buildTimeline(plan, withExact, analyses, edits);
   };
 
+  // Clips that aren't the creator's own footage say so, so the Director never presents them as real.
+  const shotTitles = plan.shots.map((x, i) =>
+    kept[i]?.origin === "ai" ? `${x.title} (AI-made illustration)` : kept[i]?.origin === "stock" ? `${x.title} (stock footage)` : x.title,
+  );
+  const aiClips = cut.filter(({ take }) => take.origin === "ai").length;
   const musicKind = finish.music === "No music" ? "none" : finish.music === "My music" ? "custom" : "generated";
 
   // The editor's timeline: rebuilt when takes, exact captions or caption edits change.
@@ -168,7 +174,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
     const v = finish.versions[look];
     const body: EditRequest = {
       // The Director sees clips as the creator trimmed them.
-      timeline: timelineForDirector(applyTrims(timeline, current?.trims ?? []), plan.shots.map((x) => x.title), current && { ...current, trims: [] }),
+      timeline: timelineForDirector(applyTrims(timeline, current?.trims ?? []), shotTitles, current && { ...current, trims: [] }),
       extras: await Promise.all(
         finish.extras.map(async (e) => ({ id: e.id, kind: e.kind, seconds: e.seconds, note: e.note, thumb: await extraThumb(e) })),
       ),
@@ -405,6 +411,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
         </div>
       )}
       {render.state === "error" && <p className={s.error} role="alert">{render.message}</p>}
+      {aiClips > 0 && <p className={s.hint} role="note"><strong>AI label:</strong> {AI_LABEL_NOTE}</p>}
       {mime && !mime.includes("mp4") && (
         <span className={s.hint}>This browser saves WebM. Instagram needs MP4 — create your video in Chrome, Edge or Safari for MP4.</span>
       )}
@@ -461,7 +468,7 @@ export function ExportStep({ plan, brief, hook, kept, onGoToShot, finish, onExpo
       state={finish}
       format={format}
       hookTitle={hookTitle}
-      shotTitles={plan.shots.map((x) => x.title)}
+      shotTitles={shotTitles}
       onAddFiles={addFiles}
       onCaption={onCaption}
       exporting={exporting}

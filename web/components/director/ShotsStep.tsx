@@ -1,6 +1,7 @@
 import { Fragment, useRef, useState } from "react";
 import { Button } from "@/components/ds/Button";
-import { recordingMinutes, SHOT_TYPE_LABEL, type Plan } from "@/lib/plan";
+import { aiEligibility, videoPrompt } from "@/lib/aiPrompts";
+import { recordingMinutes, SHOT_TYPE_LABEL, type Brief, type Plan } from "@/lib/plan";
 import type { Take } from "@/lib/takes";
 import { Term } from "./Term";
 import { takeFromFile } from "./useRecorder";
@@ -18,13 +19,16 @@ type Props = {
   onUpload: (take: Take) => void;
   onAskLine: (shot: number) => void;
   askBusy: boolean;
+  brief: Pick<Brief, "concept" | "audience" | "look">;
 };
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
-export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeconds, onRecord, onUpload, onAskLine, askBusy }: Props) {
+export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeconds, onRecord, onUpload, onAskLine, askBusy, brief }: Props) {
   const detailRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const aiFileRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const total = plan.shots.length;
@@ -32,13 +36,24 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
   const requiredLeft = plan.shots.filter((x, i) => x.required && !kept[i]).length;
   const cur = plan.shots[shot];
 
-  const upload = async (file: File | undefined) => {
+  const ai = aiEligibility(cur);
+  const prompt = ai.ok ? videoPrompt(cur, brief) : "";
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const upload = async (file: File | undefined, origin?: "ai") => {
     setUploadError("");
     if (!file) return;
     if (!file.type.startsWith("video/")) return setUploadError("Choose a video file.");
     if (file.size > MAX_UPLOAD_BYTES) return setUploadError("That clip is over 500 MB. Trim it and try again.");
     try {
-      onUpload(await takeFromFile(file, shot));
+      const take = await takeFromFile(file, shot);
+      onUpload(origin ? { ...take, origin } : take);
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : "Couldn’t read that clip.");
     }
@@ -86,7 +101,7 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
                   <span className={`${s.shotMark} ${kept[i] ? s.shotMarkDone : ""}`} aria-label={kept[i] ? "Recorded" : undefined}>{i + 1}</span>
                   <span className={s.stack} style={{ gap: 2 }}>
                     <span className={s.shotTitle}>{x.title}</span>
-                    <span className={s.small}>{SHOT_TYPE_LABEL[x.type]} · {x.size} · {x.seconds}s</span>
+                    <span className={s.small}>{SHOT_TYPE_LABEL[x.type]} · {x.size} · {x.seconds}s{kept[i]?.origin === "ai" ? " · AI-made" : ""}</span>
                   </span>
                   <span className={s.tiny}>{x.required ? "" : "Optional"}</span>
                 </button>
@@ -164,6 +179,36 @@ export function ShotsStep({ plan, shot, kept, onPickShot, onEditLine, onEditSeco
               />
             </div>
             {uploadError && <p className={s.error} role="alert">{uploadError}</p>}
+            {(cur.type === "b-roll" || cur.type === "insert") && (
+              <details className={s.aiPanel} key={shot}>
+                <summary>Can’t film this? Make it with AI</summary>
+                {ai.ok ? (
+                  <div className={s.stack} style={{ gap: 12 }}>
+                    <span className={s.hint}>
+                      Paste this into a text-to-video tool (Sora, Veo, Runway, Kling and the like), download the clip, then upload it
+                      here. It’s marked as AI-made so you remember to label it when you post.
+                    </span>
+                    <textarea className={s.lineInput} readOnly rows={9} value={prompt} aria-label="AI video prompt" onFocus={(e) => e.currentTarget.select()} />
+                    <div className={s.actions}>
+                      <Button variant="outline" size="sm" icon={copied ? "check" : undefined} onClick={copyPrompt}>{copied ? "Copied" : "Copy prompt"}</Button>
+                      <Button variant="outline" size="sm" icon="upload" onClick={() => aiFileRef.current?.click()}>Upload the AI clip</Button>
+                      <input
+                        ref={aiFileRef}
+                        type="file"
+                        accept="video/*"
+                        hidden
+                        onChange={(e) => {
+                          upload(e.target.files?.[0], "ai");
+                          e.target.value = "";
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <span className={s.hint}>{ai.reason}</span>
+                )}
+              </details>
+            )}
           </div>
         </div>
       </div>

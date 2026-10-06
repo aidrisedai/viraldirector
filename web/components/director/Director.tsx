@@ -367,6 +367,7 @@ export function Director({ projectId: startProject, ideaId: startIdea, videoId: 
           onUpload={addTake}
           onAskLine={chat.askLine}
           askBusy={chat.busy}
+          brief={brief}
         />
       )}
       {step === 4 && plan && <RecordStep plan={plan} shot={shot} onTake={addTake} onBack={() => setStep(3)} />}
